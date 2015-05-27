@@ -26,12 +26,8 @@ https://github.com/OliverSherouse/bls
 
 #####api_key.txt
 Your BLS api key, available here:
-
 http://data.bls.gov/registrationEngine/
 
 #####sql_engine.txt
 The sqlalchemy address to your sql database:
-
 http://docs.sqlalchemy.org/en/latest/core/engines.html
-
-banana banana banana

@@ -22,4 +22,4 @@ See: http://docs.sqlalchemy.org/en/latest/core/engines.html
 
 banana banana banana
 
--![alt text](http://i.imgur.com/wGFYgwm.gif "Do pigs have ears?")
+![database at work](http://i.imgur.com/wGFYgwm.gif)

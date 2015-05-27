@@ -31,7 +31,7 @@ from sqlalchemy import create_engine
 import pandas as pd
 from bls import get_series
 
-def series_tupler(prefix, seasonal, geo, measure):
+def series_tupler(prefix, seasonal, geo, measure, sector=""):
     """
     takes a pandas dataframe and returns a tuple of tuples
         with the innermost tuples containing series IDs at
@@ -49,8 +49,8 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
         a tuple of tuples of series IDs to fetch and a desired date range.
 
     **TODO: Improve error handling by:
-        Splitting a broken 50 code series into individual codes to avoid 
-        losing 49 working series on a single broken series
+        Determining exactly which codes are breaking
+        Retrying broken 50 code series (minus broken codes)
     """
     try:
         df, resp = get_series(series, api_key, start_year, end_year)
@@ -112,15 +112,12 @@ print "Welcome to Atlas automated Bureau of Labor Statistics API dredger v1.0"
 
 with open ('api_key.txt', 'r') as f:
     api_key = f.read()
-
 with open ('sql_engine.txt', 'r') as f:
     engine_address = f.read()
 
 engine = create_engine(engine_address)
-
 startyear = str(date.today().year - 1)
 endyear = str(date.today().year)
-
 pre_df = pd.DataFrame.from_csv("prefix.csv")
 pre_df['prefix'] = pre_df.index
 
@@ -138,26 +135,25 @@ engine.execute("CREATE TABLE IF NOT EXISTS incubator (`SeriesID` varchar(63),"
     " `data` float, `date` datetime)")
 engine.execute("TRUNCATE TABLE incubator")
 
-for index, row in pre_df.iterrows():
-    s_df = pd.read_csv(row['prefix'] + "/Seasonal_Codes.csv")
-    geo_df = pd.read_csv("BLS_County_Codes.csv")
-    mc_df = pd.read_csv(
-        row['prefix'] + "/Measure_Codes.csv", 
+for x in range(0, len(pre_df.index), 1):
+    p = pre_df['prefix'].iloc[x]
+    s_df = pd.read_csv(p + "/seasonal_codes.csv")
+    geo_df = pd.read_csv(p + "/geo_codes.csv")
+    mc_df = pd.read_csv(p + "/measure_codes.csv",
         converters={'measure_code': lambda x: str(x)})
-    data_extractor(row['prefix'], s_df, geo_df, mc_df, api_key, engine, 
+    data_extractor(pre_df['prefix'].iloc[x], s_df, geo_df, mc_df, api_key, engine, 
         startyear, endyear)
 
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`SeriesID` varchar(63),"
     " `data` float, `date` datetime)")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`SeriesID` varchar(63),"
     " `data` float, `date` datetime)")
-
 engine.execute("INSERT INTO archive SELECT f.`SeriesID`, f.`data`, f.`date`"
     " FROM fact as f JOIN incubator AS i ON f.`SeriesID` = i.`SeriesID` AND"
     " f.`date` = i.`date` AND f.`data` != i.`data`")
 
 """
-----Not sure if this is necessary----
+----Not sure how to run this once & never again----
 adding unique constraint for incubator/fact insert into
 """
 #engine.execute("ALTER TABLE fact ADD CONSTRAINT fact_UQ"

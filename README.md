@@ -1,14 +1,16 @@
 # Automatic BLS!
-##### Making BLS data accessible since May 2015.
+#### Making BLS data accessible since May 2015.
 
 Automatic_bls.py does the following:
 
 1. Query api based on series read from csv files
 2. Send api data to sql database, updating and archiving deprecated data
 
-######Will eventually command line argument of desired database prefix
-e.g. $ python automatic_bls.py LA
-
+#####Will eventually require command line argument of desired database prefix
+Options will include:
+$ python automatic_bls.py LA
+$ python automatic_bls.py SM
+$ python automatic_bls.py EN
 
 ###Requirements (not included here):
 
@@ -23,11 +25,13 @@ Developed by Oliver Sherouse, available here:
 https://github.com/OliverSherouse/bls
 
 #####api_key.txt
-.txt file containing your BLS api key, available here:
+Your BLS api key, available here:
+
 http://data.bls.gov/registrationEngine/
 
 #####sql_engine.txt
-.txt file containing the sqlalchemy address to your sql database
-See: http://docs.sqlalchemy.org/en/latest/core/engines.html
+The sqlalchemy address to your sql database:
+
+http://docs.sqlalchemy.org/en/latest/core/engines.html
 
 banana banana banana

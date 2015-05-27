@@ -22,4 +22,4 @@ See: http://docs.sqlalchemy.org/en/latest/core/engines.html
 
 banana banana banana
 
-![database at work](http://i.imgur.com/wGFYgwm.gif)
+![database at work](http://i.imgur.com/wGFYgwm.gifv)

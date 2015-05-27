@@ -8,11 +8,14 @@ Automatic_bls.py does the following:
 
 #####Will eventually require command line argument of desired database prefix
 Options will include:
+
 $ python automatic_bls.py LA
+
 $ python automatic_bls.py SM
+
 $ python automatic_bls.py EN
 
-###Requirements (not included here):
+###Requirements
 
 #####sqlalchemy
 http://docs.sqlalchemy.org/en/latest/intro.html#installation-guide

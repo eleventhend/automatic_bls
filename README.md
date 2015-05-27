@@ -1,5 +1,5 @@
 # Automatic BLS!
-#### Making BLS data accessible since May 2015.
+##### Making BLS data accessible since May 2015.
 
 Automatic_bls.py does the following:
 
@@ -22,4 +22,4 @@ See: http://docs.sqlalchemy.org/en/latest/core/engines.html
 
 banana banana banana
 
--![alt text](http://i.imgur.com/wGFYgwm.gifv "Do pigs have ears?")
+-![alt text](http://i.imgur.com/wGFYgwm.gif "Do pigs have ears?")

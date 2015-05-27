@@ -21,5 +21,3 @@ http://data.bls.gov/registrationEngine/
 See: http://docs.sqlalchemy.org/en/latest/core/engines.html
 
 banana banana banana
-
-![database at work](http://i.imgur.com/wGFYgwm.gifv)

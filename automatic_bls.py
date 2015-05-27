@@ -1,5 +1,5 @@
 """
-bls_automated.py:
+automatic_bls.py:
 1. Query api based on series read from csv files
 2. Send api data to sql database, updating and archiving deprecated data
 """
@@ -172,5 +172,7 @@ engine.execute("INSERT INTO fact (`SeriesID`, `data`, `date`) SELECT"
 #    " GROUP BY `SeriesID`, `data`, `date`")
 #engine.execute("DROP TABLE incubator")
 #engine.execute("RENAME TABLE dedupe TO incubator")
+
+engine.execute("DROP TABLE incubator")
 
 print "complete! excelsior!"

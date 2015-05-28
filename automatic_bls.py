@@ -17,12 +17,12 @@ automatic_bls.py:
 #GNU General Public License for more details.
 
 #You should have received a copy of the GNU General Public License
-#along with this program; if not. If not, see <http://www.gnu.org/licenses/>.
+#along with this program; if not, see <http://www.gnu.org/licenses/>.
 
-import sys
 import time
 from datetime import date
 import csv
+import argparse
 
 import json
 from urllib2 import Request, urlopen
@@ -30,18 +30,6 @@ from urllib2 import Request, urlopen
 from sqlalchemy import create_engine
 import pandas as pd
 from bls import get_series
-
-def series_tupler(prefix, seasonal, geo, measure, sector=""):
-    """
-    takes a pandas dataframe and returns a tuple of tuples
-        with the innermost tuples containing series IDs at
-        maximum size for the API (50)
-    """
-    x_ser = ()
-    for index, row in geo.iterrows():
-        x_ser = x_ser + ((prefix + seasonal + row['area_code'] + measure),)
-    series = [x_ser[i:i+49] for i in range(0, len(x_ser), 50)]
-    return series
 
 def api_to_sql(series, api_key, engine, start_year, end_year):
     """
@@ -54,32 +42,22 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
     """
     try:
         df, resp = get_series(series, api_key, start_year, end_year)
-    except KeyError:
+        for k in range (1, len(df.columns)):
+            df_sql = dataframe_sequencer(df, k)
+            pd.DataFrame.to_sql(df_sql, con=engine, name='incubator',
+                if_exists='append', index=False)
+        print "Query successful!"
+    except Exception as e:
         with open('errors.txt', 'a') as errorfile:
             errorfile.write('\n'.join(series))
             errorfile.write('\n' + api_key)
             errorfile.write('\n' + start_year)
             errorfile.write('\n' + end_year + '\n')
-        try:
-            print "let's check the api's response..."
-            print resp
-        except:
-            "No response returned (KeyError)!"
-        return
-    except:
-        print "There was an unknown error!"
-        e = sys.exc_info()[0:2]
         with open ('type_errors.txt', 'a') as te_file:
-            te_file.write("Error: %s" % (e,))
-        try:
-            print resp
-        except:
-            print "No response returned (Unknown, check type_errors file)!"
+            te_file.write("Error: %s \n" % (e,))
+        print "Query failed, waiting 5 seconds"
+        time.sleep(5)
         return
-    for k in range (1, len(df.columns)):
-        df_sql = dataframe_sequencer(df, k)
-        pd.DataFrame.to_sql(df_sql, con=engine, name='incubator',
-            if_exists='append', index=False)
     return
 
 def dataframe_sequencer(df, i):
@@ -94,19 +72,39 @@ def dataframe_sequencer(df, i):
     df_sql['SeriesID'] = df.columns[i]
     return df_sql
 
-def data_extractor(
-    prefix, seasonal, geo, measure_code, api_key, engine, startyear, endyear):
+def data_extractor(prefix, seasonal, geo, m_c, api_key, engine, startyear, 
+    endyear, sector=pd.DataFrame()):
     """
     Uses the above functions to create batches of series IDs, sending them
         to the BLS api, and passing the returned data to the Atlas SQL server.
     """
-    for index, row1 in seasonal.iterrows():
-        for index, row2 in measure_code.iterrows():
-            series=series_tupler(
-                prefix, row1['seasonal_code'], geo, row2['measure_code'])
-            for i in range(0, len(series)):
-                api_to_sql(series[i], api_key, engine, startyear, endyear)
+    try:
+        sector['industry_code'].iloc[0]
+    except:
+       sector = pd.DataFrame(index=[0], columns=['industry_code'])
+       sector = sector.fillna('')
+
+    x_ser = ()
+
+    for x in range(0, len(seasonal.index), 1):
+        for y in range(0, len(m_c.index), 1):
+            for z in range(0, len(sector.index), 1):
+                for i in range(0, len(geo.index), 1):
+                    x_ser = x_ser + ((prefix + 
+                        seasonal['seasonal_code'].iloc[x] + 
+                        geo['area_code'].iloc[i] + 
+                        sector['industry_code'].iloc[z] + 
+                        m_c['measure_code'].iloc[y]),)
+                    series = [x_ser[i:i+49] for i in range(0, len(x_ser), 50)]
+                    for i in range(0, len(series)):
+                        api_to_sql(series[i], api_key, engine, startyear, 
+                            endyear)
     return
+
+parser = argparse.ArgumentParser()
+parser.add_argument("Prefix", help="Requires the prefix of the desired"
+    " database as an argument")
+args = parser.parse_args()
 
 print "Welcome to Atlas automated Bureau of Labor Statistics API dredger v1.0"
 
@@ -118,8 +116,6 @@ with open ('sql_engine.txt', 'r') as f:
 engine = create_engine(engine_address)
 startyear = str(date.today().year - 1)
 endyear = str(date.today().year)
-pre_df = pd.DataFrame.from_csv("prefix.csv")
-pre_df['prefix'] = pre_df.index
 
 """
 1 - Empties out the incubator table
@@ -130,45 +126,52 @@ pre_df['prefix'] = pre_df.index
     3.1 - Sends deprecated data to archive table
     3.2 - Updates fact table with new data
 """
-
+"""
 engine.execute("CREATE TABLE IF NOT EXISTS incubator (`SeriesID` varchar(63),"
     " `data` float, `date` datetime)")
 engine.execute("TRUNCATE TABLE incubator")
-
-for x in range(0, len(pre_df.index), 1):
-    p = pre_df['prefix'].iloc[x]
-    s_df = pd.read_csv(p + "/seasonal_codes.csv")
-    geo_df = pd.read_csv(p + "/geo_codes.csv")
-    mc_df = pd.read_csv(p + "/measure_codes.csv",
-        converters={'measure_code': lambda x: str(x)})
-    data_extractor(pre_df['prefix'].iloc[x], s_df, geo_df, mc_df, api_key, engine, 
+"""
+s_df = pd.read_csv(args.Prefix + "/seasonal_codes.csv")
+geo_df = pd.read_csv(args.Prefix + "/geo_codes.csv",
+    converters={'geo_code': lambda x: str(x)})
+mc_df = pd.read_csv(args.Prefix + "/measure_codes.csv",
+    converters={'measure_code': lambda x: str(x)})
+try:
+    sector_df = pd.read_csv(args.Prefix + "sector_codes.csv",
+        converters={'sector_code': lambda x: str(x)})
+    data_extractor(args.Prefix, s_df, geo_df, mc_df, api_key, engine, 
+        startyear, endyear, sector_df)
+except:
+    data_extractor(args.Prefix, s_df, geo_df, mc_df, api_key, engine, 
         startyear, endyear)
 
+"""
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`SeriesID` varchar(63),"
     " `data` float, `date` datetime)")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`SeriesID` varchar(63),"
-    " `data` float, `date` datetime)")
+    " `data` float, `date` datetime, `archivedate` "
+    "TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
 engine.execute("INSERT INTO archive SELECT f.`SeriesID`, f.`data`, f.`date`"
     " FROM fact as f JOIN incubator AS i ON f.`SeriesID` = i.`SeriesID` AND"
     " f.`date` = i.`date` AND f.`data` != i.`data`")
-
 """
-----Not sure how to run this once & never again----
+"""
+----Not sure yet how to run this as 'if not exists'----
 adding unique constraint for incubator/fact insert into
 """
 #engine.execute("ALTER TABLE fact ADD CONSTRAINT fact_UQ"
 #    " UNIQUE(`SeriesID`, `date`)")
-
+"""
 engine.execute("INSERT INTO fact (`SeriesID`, `data`, `date`) SELECT"
     " i.`SeriesID`, i.`data`, i.`date` FROM incubator AS i ON DUPLICATE"
     " KEY UPDATE `data` = VALUES(`data`)")
-
+"""
 """incubator deduping queries...may not be necessary, are slow"""
 #engine.execute("CREATE TABLE dedupe as SELECT * FROM incubator WHERE 1"
 #    " GROUP BY `SeriesID`, `data`, `date`")
 #engine.execute("DROP TABLE incubator")
 #engine.execute("RENAME TABLE dedupe TO incubator")
-
+"""
 engine.execute("DROP TABLE incubator")
-
+"""
 print "complete! excelsior!"

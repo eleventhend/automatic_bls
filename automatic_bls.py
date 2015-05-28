@@ -126,11 +126,11 @@ endyear = str(date.today().year)
     3.1 - Sends deprecated data to archive table
     3.2 - Updates fact table with new data
 """
-"""
+
 engine.execute("CREATE TABLE IF NOT EXISTS incubator (`SeriesID` varchar(63),"
     " `data` float, `date` datetime)")
 engine.execute("TRUNCATE TABLE incubator")
-"""
+
 s_df = pd.read_csv(args.Prefix + "/seasonal_codes.csv")
 geo_df = pd.read_csv(args.Prefix + "/geo_codes.csv",
     converters={'geo_code': lambda x: str(x)})
@@ -145,7 +145,7 @@ except:
     data_extractor(args.Prefix, s_df, geo_df, mc_df, api_key, engine, 
         startyear, endyear)
 
-"""
+
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`SeriesID` varchar(63),"
     " `data` float, `date` datetime)")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`SeriesID` varchar(63),"
@@ -154,24 +154,24 @@ engine.execute("CREATE TABLE IF NOT EXISTS archive (`SeriesID` varchar(63),"
 engine.execute("INSERT INTO archive SELECT f.`SeriesID`, f.`data`, f.`date`"
     " FROM fact as f JOIN incubator AS i ON f.`SeriesID` = i.`SeriesID` AND"
     " f.`date` = i.`date` AND f.`data` != i.`data`")
-"""
+
 """
 ----Not sure yet how to run this as 'if not exists'----
 adding unique constraint for incubator/fact insert into
 """
 #engine.execute("ALTER TABLE fact ADD CONSTRAINT fact_UQ"
 #    " UNIQUE(`SeriesID`, `date`)")
-"""
+
 engine.execute("INSERT INTO fact (`SeriesID`, `data`, `date`) SELECT"
     " i.`SeriesID`, i.`data`, i.`date` FROM incubator AS i ON DUPLICATE"
     " KEY UPDATE `data` = VALUES(`data`)")
-"""
+
 """incubator deduping queries...may not be necessary, are slow"""
 #engine.execute("CREATE TABLE dedupe as SELECT * FROM incubator WHERE 1"
 #    " GROUP BY `SeriesID`, `data`, `date`")
 #engine.execute("DROP TABLE incubator")
 #engine.execute("RENAME TABLE dedupe TO incubator")
-"""
+
 engine.execute("DROP TABLE incubator")
-"""
+
 print "complete! excelsior!"

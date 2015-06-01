@@ -6,7 +6,6 @@ Automatic_bls.py does the following:
 1. Query api based on series read from csv files
 2. Send api data to sql database, updating and archiving deprecated data
 
-
 """
 1 - Empties out the incubator table
 2 - Sends requests to BLS API for all prefixes listed in prefix.csv

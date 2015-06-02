@@ -47,6 +47,7 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
             pd.DataFrame.to_sql(df_sql, con=engine, name='incubator',
                 if_exists='append', index=False)
         print "Query successful!"
+        time.sleep(5)
     except Exception as e:
         with open('errors.txt', 'a') as errorfile:
             errorfile.write('\n'.join(series))
@@ -87,27 +88,12 @@ def data_extractor(prefix, seasonal, geo, m_c, api_key, engine, startyear,
     for x in range(0, len(seasonal.index), 1):
         for y in range(0, len(m_c.index), 1):
             for z in range(0, len(sector.index), 1):
-                df_sql = pd.DataFrame(index = [0], columns = ['SeriesID',
-                    'seasonal_code', 'area_code', 'sector_code',
-                    'measure_code'])
                 for i in range(0, len(geo.index), 1):
                     ser_concat = (prefix + seasonal['seasonal_code'].iloc[x] + 
                         geo['area_code'].iloc[i] + 
                         sector['sector_code'].iloc[z] + 
                         m_c['measure_code'].iloc[y])
                     allseries = allseries + (ser_concat,)
-                    df_con = pd.DataFrame(index = [0], columns = ['SeriesID',
-                        'seasonal_code', 'area_code', 'sector_code',
-                        'measure_code'])
-                    df_con['SeriesID'] = ser_concat
-                    df_con['area_code'] = geo['area_code'].iloc[i]
-                    df_sql = df_sql.append(df_con, True)
-                df_sql['sector_code'] = sector['sector_code'].iloc[z]
-                df_sql['seasonal_code'] = seasonal['seasonal_code'].iloc[x]
-                df_sql['measure_code'] = m_c['measure_code'].iloc[y]
-                df_sql = df_sql.dropna()
-                pd.DataFrame.to_sql(df_sql, con=engine, name='series_dim',
-                    if_exists='append', index=False)
     series = [allseries[i:i+49] for i in range(0, len(allseries), 50)]
     for i in range(0, len(series)):
         api_to_sql(series[i], api_key, engine, startyear, endyear)

@@ -41,14 +41,9 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
         Retrying broken 50 code series (minus broken codes)
     """
     try:
-        df, resp = get_series(series, api_key, start_year, end_year)
+        df = get_series(series, api_key, start_year, end_year)
         for k in range (1, len(df.columns)):
             df_sql = dataframe_sequencer(df, k)
-            df_sql['prefix'] = prefix
-            df_sql['seasonal_code'] = seasonal
-            df_sql['area_code'] = geo
-            df_sql['measure_code'] = m_c
-            df_sql['sector_code'] = sector
             pd.DataFrame.to_sql(df_sql, con=engine, name='incubator',
                 if_exists='append', index=False)
         print "Query successful!"
@@ -60,11 +55,6 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
             errorfile.write('\n' + end_year + '\n')
         with open ('type_errors.txt', 'a') as te_file:
             te_file.write("Error: %s \n" % (e,))
-        try:
-            with open ('botched_responses.txt', 'a') as respfile:
-                respfile.write(resp + "\n")
-        except:
-            pass
         print "Query failed, waiting 5 seconds"
         time.sleep(5)
         return
@@ -93,26 +83,32 @@ def data_extractor(prefix, seasonal, geo, m_c, api_key, engine, startyear,
     except:
        sector = pd.DataFrame(index = [0], columns = ['sector_code'])
        sector = sector.fillna('')
-    x_ser = ()
+    allseries = ()
     for x in range(0, len(seasonal.index), 1):
         for y in range(0, len(m_c.index), 1):
             for z in range(0, len(sector.index), 1):
+                df_sql = pd.DataFrame(index = [0], columns = ['SeriesID',
+                    'seasonal_code', 'area_code', 'sector_code',
+                    'measure_code'])
                 for i in range(0, len(geo.index), 1):
-                    ser_pack = (prefix + seasonal['seasonal_code'].iloc[x] + 
+                    ser_concat = (prefix + seasonal['seasonal_code'].iloc[x] + 
                         geo['area_code'].iloc[i] + 
                         sector['sector_code'].iloc[z] + 
                         m_c['measure_code'].iloc[y])
-                    x_ser = x_ser + (ser_pack,)
-                    df_sql = pd.DataFrame(index = [1], columns = ['SeriesID',
+                    allseries = allseries + (ser_concat,)
+                    df_con = pd.DataFrame(index = [0], columns = ['SeriesID',
                         'seasonal_code', 'area_code', 'sector_code',
-                         'measure_code'])
-                    df_sql['SeriesID'] = ser_pack
-                    df_sql['seasonal_code'] = seasonal['seasonal_code'].iloc[x]
-                    df_sql['area_code'] = geo['area_code'].iloc[i]
-                    df_sql['measure_code'] = sector['sector_code'].iloc[z]
-                    df_sql['sector_code'] = sector['sector_code'].iloc[z]
-                    
-    series = [x_ser[i:i+49] for i in range(0, len(x_ser), 50)]
+                        'measure_code'])
+                    df_con['SeriesID'] = ser_concat
+                    df_con['area_code'] = geo['area_code'].iloc[i]
+                    df_sql = df_sql.append(df_con, True)
+                df_sql['sector_code'] = sector['sector_code'].iloc[z]
+                df_sql['seasonal_code'] = seasonal['seasonal_code'].iloc[x]
+                df_sql['measure_code'] = m_c['measure_code'].iloc[y]
+                df_sql = df_sql.dropna()
+                pd.DataFrame.to_sql(df_sql, con=engine, name='series_dim',
+                    if_exists='append', index=False)
+    series = [allseries[i:i+49] for i in range(0, len(allseries), 50)]
     for i in range(0, len(series)):
         api_to_sql(series[i], api_key, engine, startyear, endyear)
     return
@@ -164,28 +160,27 @@ engine.execute("INSERT INTO archive (`SeriesID`, `data`, `date`, \
 engine.execute("DROP PROCEDURE IF EXISTS atlas_bls.`CreateIndex`")
 engine.execute("""CREATE PROCEDURE atlas_bls.`CreateIndex`
 (
-    given_db    VARCHAR(64),
-    given_table VARCHAR(64),
-    given_index VARCHAR(64),
-    given_columns   VARCHAR(64)
+    g_db    VARCHAR(64),
+    g_table VARCHAR(64),
+    g_index VARCHAR(64),
+    g_col   VARCHAR(64)
 )
 BEGIN
     DECLARE IndexExists INTEGER;
     SELECT COUNT(1) INTO IndexExists
     FROM INFORMATION_SCHEMA.STATISTICS
-    WHERE table_schema = given_db
-    AND table_name = given_table
-    AND index_name = given_index;
+    WHERE table_schema = g_db
+    AND table_name = g_table
+    AND index_name = g_index;
     
     IF IndexExists = 0 THEN
-        SET @sqlstmt = CONCAT('CREATE INDEX ', given_index, ' ON ', given_db, '.', given_table, ' (', given_columns, ')');
+        SET @sqlstmt = CONCAT('CREATE INDEX ', g_index, ' ON ', g_db, '.', g_table, ' (', g_col, ')');
         PREPARE st FROM @sqlstmt;
         EXECUTE st;
         DEALLOCATE PREPARE st;
     ELSE
-        SELECT CONCAT('Index ', given_index, ' already exists on Table ', given_db, '.', given_table) CreateindexErrorMessage;
+        SELECT CONCAT('Index ', g_index, ' exists.') CreateindexErrorMessage;
     END IF;
-    
 END""")
 engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'fact_UQ', \
     'SeriesID,date')")

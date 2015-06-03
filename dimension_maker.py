@@ -68,4 +68,4 @@ for x in range(0, len(prefix.index), 1):
     dim_add_dedupe(m_c, engine, "dim_measure_codes")
     dim_add_dedupe(seasonal, engine, "dim_seasonal")
 
-print "to the moon!"
+print "jimmy brungus!"

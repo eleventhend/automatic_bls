@@ -99,31 +99,36 @@ def data_extractor(prefix, seasonal, geo, m_c, api_key, engine, startyear,
         api_to_sql(series[i], api_key, engine, startyear, endyear)
     return
 
+#Retrieves a single command line argument which determines the target database
 parser = argparse.ArgumentParser()
 parser.add_argument("Prefix", help = "Requires the prefix of the desired \
     database as an argument")
 args = parser.parse_args()
 
-print "Welcome to Atlas automated Bureau of Labor Statistics API dredger v1.0"
-
+#Get API key and SQL engine address (secure info)
 with open ('api_key.txt', 'r') as f:
     api_key = f.read()
 with open ('sql_engine.txt', 'r') as f:
     engine_address = f.read()
 
+#Setup sqlalchemy engine; set start & end year to last year and this year
 engine = create_engine(engine_address)
 startyear = str(date.today().year - 1)
 endyear = str(date.today().year)
 
+#set up empty incubator table
 engine.execute("CREATE TABLE IF NOT EXISTS incubator (`SeriesID` varchar(63), \
     `data` float, `date` datetime)")
 engine.execute("TRUNCATE TABLE incubator")
 
+#Get series code components from CSV
 s_df = pd.read_csv(args.Prefix + "/seasonal_codes.csv")
 geo_df = pd.read_csv(args.Prefix + "/geo_codes.csv",
     converters={'area_code': lambda x: str(x)})
 mc_df = pd.read_csv(args.Prefix + "/measure_codes.csv",
     converters={'measure_code': lambda x: str(x)})
+
+#If there is a sector file for this database use it; otherwise don't
 try:
     sector_df = pd.read_csv(args.Prefix + "/sector_codes.csv",
         converters={'sector_code': lambda x: str(x)})
@@ -133,6 +138,8 @@ except:
     data_extractor(args.Prefix, s_df, geo_df, mc_df, api_key, engine, 
         startyear, endyear)
 
+#Checks that fact and archive tables exist
+#Inserts changed fact entries into the archive table
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`SeriesID` varchar(63), \
     `data` float, `date` datetime)")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`SeriesID` varchar(63), \
@@ -143,6 +150,9 @@ engine.execute("INSERT INTO archive (`SeriesID`, `data`, `date`, \
     CURRENT_TIMESTAMP FROM `fact` as f JOIN `incubator` AS i ON \
     f.`SeriesID` = i.`SeriesID` AND f.`date` = i.`date` AND \
     f.`data` != i.`data`")
+
+#Creates a sql procedure which checks whether a specific unique index exists,
+#then creates it in the desired table if it does not.
 engine.execute("DROP PROCEDURE IF EXISTS atlas_bls.`CreateIndex`")
 engine.execute("""CREATE PROCEDURE atlas_bls.`CreateIndex`
 (
@@ -168,11 +178,16 @@ BEGIN
         SELECT CONCAT('Index ', g_index, ' exists.') CreateindexErrorMessage;
     END IF;
 END""")
+
+#Creates unique index needed for 'insert into ... on duplicate key update'
 engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'fact_UQ', \
     'SeriesID,date')")
+
+#Then inserts incubator entries into fact table, updating data when possible
+#Finally, drops the incubator table
 engine.execute("INSERT INTO fact (`SeriesID`, `data`, `date`) SELECT"
     " i.`SeriesID`, i.`data`, i.`date` FROM incubator AS i ON DUPLICATE"
     " KEY UPDATE `data` = VALUES(`data`)")
 engine.execute("DROP TABLE incubator")
 
-print "complete! excelsior!"
+print "to the moon!"

@@ -33,8 +33,8 @@ from bls import get_series
 
 def api_to_sql(series, api_key, engine, start_year, end_year):
     """
-    outputs to a sql database a fact table based on input of
-        a tuple of tuples of series IDs to fetch and a desired date range.
+    Outputs to a sql database a fact table based on an input of
+        a tuple of tuples of SeriesIDs to fetch and a desired date range.
 
     **TODO: Improve error handling by:
         Determining exactly which codes are breaking
@@ -63,8 +63,8 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
 
 def dataframe_sequencer(df, i):
     """
-    takes a dataframe of raw api data and
-        transforms it into a fact-table friendly format
+    Takes a dataframe of raw api data and transforms it into the format
+        required by the fact table (3 columns, SeriesID/data/date)
     """
     df_sql = pd.DataFrame({'date':[], 'SeriesID':[], 'data':[]})
     df_sql['date'] = df.index
@@ -76,8 +76,9 @@ def dataframe_sequencer(df, i):
 def data_extractor(prefix, seasonal, geo, m_c, api_key, engine, startyear, 
     endyear, sector = pd.DataFrame()):
     """
-    Uses the above functions to create batches of series IDs, sending them
-        to the BLS api, and passing the returned data to the Atlas SQL server.
+    Uses previously defined functions to create batches of SeriesIDs, sends 
+        them to the BLS api, and inserts the returned data to an incubator
+        table in the SQL server.
     """
     try:
         sector['sector_code'].iloc[0]

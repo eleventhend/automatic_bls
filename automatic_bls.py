@@ -189,6 +189,6 @@ engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'fact_UQ', \
 engine.execute("INSERT INTO fact (`SeriesID`, `data`, `date`) SELECT"
     " i.`SeriesID`, i.`data`, i.`date` FROM incubator AS i ON DUPLICATE"
     " KEY UPDATE `data` = VALUES(`data`)")
-engine.execute("DROP TABLE incubator")
+engine.execute("TRUNCATE TABLE incubator")
 
 print "to the moon!"

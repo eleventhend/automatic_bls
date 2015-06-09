@@ -34,7 +34,7 @@ from bls import get_series
 def api_to_sql(series, api_key, engine, start_year, end_year):
     """
     Outputs to a sql database a fact table based on an input of
-        a tuple of tuples of SeriesIDs to fetch and a desired date range.
+        a tuple of tuples of series to fetch and a desired date range.
 
     **TODO: Improve error handling by:
         Determining exactly which codes are breaking
@@ -46,7 +46,7 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
             df_sql = dataframe_sequencer(df, k)
             pd.DataFrame.to_sql(df_sql, con=engine, name='incubator',
                 if_exists='append', index=False)
-        print "Query successful!"
+        #print "Query successful!"
         time.sleep(5)
     except Exception as e:
         with open('errors.txt', 'a') as errorfile:
@@ -56,7 +56,7 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
             errorfile.write('\n' + end_year + '\n')
         with open ('type_errors.txt', 'a') as te_file:
             te_file.write("Error: %s \n" % (e,))
-        print "Query failed, waiting 5 seconds"
+        #print "Query failed, waiting 5 seconds"
         time.sleep(5)
         return
     return
@@ -64,19 +64,19 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
 def dataframe_sequencer(df, i):
     """
     Takes a dataframe of raw api data and transforms it into the format
-        required by the fact table (3 columns, SeriesID/data/date)
+        required by the fact table (3 columns, series/data/date)
     """
-    df_sql = pd.DataFrame({'date':[], 'SeriesID':[], 'data':[]})
+    df_sql = pd.DataFrame({'date':[], 'series':[], 'data':[]})
     df_sql['date'] = df.index
     df_sql.index = df.index
     df_sql['data'] = df[df.columns[i]]
-    df_sql['SeriesID'] = df.columns[i]
+    df_sql['series'] = df.columns[i]
     return df_sql
 
 def data_extractor(prefix, seasonal, geo, m_c, api_key, engine, startyear, 
     endyear, sector = pd.DataFrame()):
     """
-    Uses previously defined functions to create batches of SeriesIDs, sends 
+    Uses previously defined functions to create batches of series, sends 
         them to the BLS api, and inserts the returned data to an incubator
         table in the SQL server.
     """
@@ -118,8 +118,14 @@ startyear = str(date.today().year - 1)
 endyear = str(date.today().year)
 
 #set up empty incubator table
-engine.execute("CREATE TABLE IF NOT EXISTS incubator (`SeriesID` varchar(63), \
-    `data` float, `date` datetime)")
+engine.execute("CREATE TABLE IF NOT EXISTS incubator (`id` int NOT NULL \
+    AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
+    `db_prefix` enum('LA','SM','EN'), `seasonal_code` enum('S','U'), \
+    `area_code` varchar(32), `area_code_id` int, \
+    `sector_code` varchar(16), `sector_code_id` int, \
+    `measure_code` varchar(4), `measure_code_id` int, \
+    `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
+    PRIMARY KEY (id))")
 engine.execute("TRUNCATE TABLE incubator")
 
 #Get series code components from CSV
@@ -141,15 +147,26 @@ except:
 
 #Checks that fact and archive tables exist
 #Inserts changed fact entries into the archive table
-engine.execute("CREATE TABLE IF NOT EXISTS fact (`SeriesID` varchar(63), \
-    `data` float, `date` datetime)")
-engine.execute("CREATE TABLE IF NOT EXISTS archive (`SeriesID` varchar(63), \
-    `data` float, `date` datetime, `archivedate` \
-    TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-engine.execute("INSERT INTO archive (`SeriesID`, `data`, `date`, \
-    `archivedate`) SELECT f.`SeriesID`, f.`data`, f.`date`, \
+engine.execute("CREATE TABLE IF NOT EXISTS fact (`id` int NOT NULL \
+    AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
+    `db_prefix` enum('LA','SM','EN'), `seasonal_code` enum('S','U'), \
+    `area_code` varchar(32), `area_code_id` int, \
+    `sector_code` varchar(16), `sector_code_id` int, \
+    `measure_code` varchar(4), `measure_code_id` int, \
+    `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
+    PRIMARY KEY (id))")
+engine.execute("CREATE TABLE IF NOT EXISTS archive (`id` int NOT NULL \
+    AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
+    `db_prefix` enum('LA','SM','EN'), `seasonal_code` enum('S','U'), \
+    `area_code` varchar(32), `area_code_id` int, \
+    `sector_code` varchar(16), `sector_code_id` int, \
+    `measure_code` varchar(4), `measure_code_id` int, \
+    `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
+    `archivedate` TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+engine.execute("INSERT INTO archive (`series`, `data`, `date`, \
+    `archivedate`) SELECT f.`series`, f.`data`, f.`date`, \
     CURRENT_TIMESTAMP FROM `fact` as f JOIN `incubator` AS i ON \
-    f.`SeriesID` = i.`SeriesID` AND f.`date` = i.`date` AND \
+    f.`series` = i.`series` AND f.`date` = i.`date` AND \
     f.`data` != i.`data`")
 
 #Creates a sql procedure which checks whether a specific unique index exists,
@@ -171,7 +188,8 @@ BEGIN
     AND index_name = g_index;
     
     IF IndexExists = 0 THEN
-        SET @sqlstmt = CONCAT('CREATE INDEX ', g_index, ' ON ', g_db, '.', g_table, ' (', g_col, ')');
+        SET @sqlstmt = CONCAT('CREATE INDEX ', g_index, ' ON ', g_db, '.', \
+            g_table, ' (', g_col, ')');
         PREPARE st FROM @sqlstmt;
         EXECUTE st;
         DEALLOCATE PREPARE st;
@@ -182,13 +200,11 @@ END""")
 
 #Creates unique index needed for 'insert into ... on duplicate key update'
 engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'fact_UQ', \
-    'SeriesID,date')")
+    'series,date')")
 
-#Then inserts incubator entries into fact table, updating data when possible
-#Finally, drops the incubator table
-engine.execute("INSERT INTO fact (`SeriesID`, `data`, `date`) SELECT"
-    " i.`SeriesID`, i.`data`, i.`date` FROM incubator AS i ON DUPLICATE"
+#Inserts incubator entries into fact table, updating data when possible
+engine.execute("INSERT INTO fact (`series`, `data`, `date`) SELECT"
+    " i.`series`, i.`data`, i.`date` FROM incubator AS i ON DUPLICATE"
     " KEY UPDATE `data` = VALUES(`data`)")
-engine.execute("TRUNCATE TABLE incubator")
 
 print "to the moon!"

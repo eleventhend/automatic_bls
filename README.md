@@ -53,3 +53,15 @@ Does the following:
 
 1. Constructs dimension tables for: series, measure, geographic, and sector codes.
 2. Fills these dimension tables with all available codes and descriptions for all prefixes in the prefix file.
+
+
+###Requirements
+#####sqlalchemy
+http://docs.sqlalchemy.org/en/latest/intro.html#installation-guide
+
+#####pandas
+http://pandas.pydata.org/pandas-docs/stable/install.html
+
+#####sql_engine.txt
+The sqlalchemy address to your sql database:
+http://docs.sqlalchemy.org/en/latest/core/engines.html

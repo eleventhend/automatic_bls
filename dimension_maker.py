@@ -14,10 +14,6 @@ def add_dedupe(df, engine, output_table):
     engine.execute("RENAME TABLE dedupe TO %(opt)s;" % {"opt": output_table})
     return
 
-def int_ifier(engine, table):
-
-    return
-
 with open ('sql_engine.txt', 'r') as f:
     engine_address = f.read()
 engine = create_engine(engine_address)

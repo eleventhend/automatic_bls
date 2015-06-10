@@ -118,14 +118,14 @@ startyear = str(date.today().year - 1)
 endyear = str(date.today().year)
 
 #set up empty incubator table
-engine.execute("CREATE TABLE IF NOT EXISTS incubator (`id` int NOT NULL \
-    AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
-    `db_prefix` enum('LA','SM','EN'), `seasonal_code` enum('S','U'), \
+engine.execute("CREATE TABLE IF NOT EXISTS incubator (`incubator_id` int(11) \
+    NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
+    datetime, `prefix` varchar(2), `seasonal_code` enum('S','U'), \
     `area_code` varchar(32), `area_code_id` int, \
     `sector_code` varchar(16), `sector_code_id` int, \
     `measure_code` varchar(4), `measure_code_id` int, \
     `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
-    PRIMARY KEY (id))")
+    PRIMARY KEY (archive_id))")
 engine.execute("TRUNCATE TABLE incubator")
 
 #Get series code components from CSV
@@ -147,22 +147,23 @@ except:
 
 #Checks that fact and archive tables exist
 #Inserts changed fact entries into the archive table
-engine.execute("CREATE TABLE IF NOT EXISTS fact (`id` int NOT NULL \
+engine.execute("CREATE TABLE IF NOT EXISTS fact (`fact_id` int(11) NOT NULL \
     AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
-    `db_prefix` enum('LA','SM','EN'), `seasonal_code` enum('S','U'), \
+    `prefix` varchar(2), `seasonal_code` enum('S','U'), \
     `area_code` varchar(32), `area_code_id` int, \
     `sector_code` varchar(16), `sector_code_id` int, \
     `measure_code` varchar(4), `measure_code_id` int, \
     `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
-    PRIMARY KEY (id))")
-engine.execute("CREATE TABLE IF NOT EXISTS archive (`id` int NOT NULL \
-    AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
-    `db_prefix` enum('LA','SM','EN'), `seasonal_code` enum('S','U'), \
+    PRIMARY KEY (fact_id))")
+engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
+    NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
+    datetime, `prefix` varchar(2), `seasonal_code` enum('S','U'), \
     `area_code` varchar(32), `area_code_id` int, \
     `sector_code` varchar(16), `sector_code_id` int, \
     `measure_code` varchar(4), `measure_code_id` int, \
     `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
-    `archivedate` TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    `archivedate` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
+    PRIMARY KEY (archive_id))")
 engine.execute("INSERT INTO archive (`series`, `data`, `date`, \
     `archivedate`) SELECT f.`series`, f.`data`, f.`date`, \
     CURRENT_TIMESTAMP FROM `fact` as f JOIN `incubator` AS i ON \

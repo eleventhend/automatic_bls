@@ -18,28 +18,27 @@ with open ('sql_engine.txt', 'r') as f:
     engine_address = f.read()
 engine = create_engine(engine_address)
 
-engine.execute("CREATE TABLE IF NOT EXISTS dimtest_series (`id` int(11) NOT NULL \
-    AUTO_INCREMENT, `series` varchar(64), `prefix` varchar(2), \
-    `prefix_long` varchar(6), `seasonal_code` enum('S','U'), \
+engine.execute("CREATE TABLE IF NOT EXISTS dimtest_series (`series_id` \
+    int(11) NOT NULL AUTO_INCREMENT, `series` varchar(64), `prefix` \
+    varchar(2), `prefix_long` varchar(6), `seasonal_code` enum('S','U'), \
     `seasonal_desc` text, `area_code` varchar(32), `area_code_id` int, \
     `sector_code` varchar(16), `sector_code_id` int, \
     `measure_code` varchar(4), `measure_code_id` int, \
-    PRIMARY KEY (`id`))")
+    PRIMARY KEY (`series_id`))")
 
-engine.execute("CREATE TABLE IF NOT EXISTS dimtest_measure_codes (`id` int \
-    NOT NULL AUTO_INCREMENT, `measure_code` varchar(2), `measure_text` text, \
-    `prefix` varchar(2), PRIMARY KEY (id))")
+engine.execute("CREATE TABLE IF NOT EXISTS dimtest_measure_codes \
+    (`measure_id` int(11) NOT NULL AUTO_INCREMENT, `measure_code` varchar(2), \
+    `measure_text` text, `prefix` varchar(2), PRIMARY KEY (measure_id))")
 
-engine.execute("CREATE TABLE IF NOT EXISTS dimtest_geo (`id` int NOT NULL \
-    AUTO_INCREMENT, `area_type_code` varchar(1), `area_code` varchar(32), \
-    `area_text` varchar(64), `state` varchar(2), `prefix` \
-    varchar(2), PRIMARY KEY (`id`))")
+engine.execute("CREATE TABLE IF NOT EXISTS dimtest_geo (`geo_id` int(11) \
+    NOT NULL AUTO_INCREMENT, `area_type_code` varchar(1), `area_code` \
+    varchar(32), `area_text` varchar(64), `state` varchar(2), `prefix` \
+    varchar(2), PRIMARY KEY (`geo_id`))")
 
-"""sector needs to have a none row"""
-
-engine.execute("CREATE TABLE IF NOT EXISTS dimtest_sector (`id` int NOT NULL \
-    AUTO_INCREMENT, `sector_code` varchar(16), `sector_name` varchar(128), \
-    `prefix` varchar(2), PRIMARY KEY (`id`))")
+engine.execute("CREATE TABLE IF NOT EXISTS dimtest_sector (`sector_id` \
+    int(11) NOT NULL AUTO_INCREMENT, `sector_code` varchar(16), \
+    `sector_name` varchar(128), `prefix` varchar(2), PRIMARY KEY \
+    (`sector_id`))")
 
 prefix = pd.read_csv("prefix.csv")
 
@@ -61,12 +60,12 @@ for x in range(0, len(prefix.index), 1):
         sector['prefix'] = p
         add_dedupe(sector, engine, "dimtest_sector")
     except:
-        sector_none = pd.DataFrame(index = [0], columns = ['sector_code' 
+        sector_none = pd.DataFrame(index = [0], columns = ['sector_code', 
             'sector_name', 'prefix'])
         sector_none['sector_code'] = "none"
         sector_none['sector_name'] = "default no sector"
         sector_none['prefix'] = p
-        #add_dedupe(sector_none, engine, "dimtest_sector")
+        add_dedupe(sector_none, engine, "dimtest_sector")
         sector = pd.DataFrame(index = [0], columns = ['sector_code'])
         sector = sector.fillna('')
     for x in range(0, len(seasonal.index), 1):
@@ -89,7 +88,7 @@ for x in range(0, len(prefix.index), 1):
                     df_sql['sector_code'] = sector['sector_code'].iloc[z]
                 df_sql['seasonal_code'] = seasonal['seasonal_code'].iloc[x]
                 df_sql['measure_code'] = m_c['measure_code'].iloc[y]
-                df_sql = df_sql.dropna()
+                #df_sql = df_sql.dropna()
                 add_dedupe(df_sql, engine, "dimtest_series")
     geo['prefix'] = p
     m_c['prefix'] = p

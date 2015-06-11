@@ -44,8 +44,8 @@ def api_to_sql(series, api_key, engine, start_year, end_year):
         df = get_series(series, api_key, start_year, end_year)
         for k in range (1, len(df.columns)):
             df_sql = dataframe_sequencer(df, k)
-            pd.DataFrame.to_sql(df_sql, con=engine, name='incubator',
-                if_exists='append', index=False)
+            df_sql.to_sql(con=engine, name='incubator', if_exists='append', 
+                index=False)
         #print "Query successful!"
         time.sleep(5)
     except Exception as e:

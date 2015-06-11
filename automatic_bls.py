@@ -73,7 +73,7 @@ def dataframe_sequencer(df, i):
     df_sql['series'] = df.columns[i]
     return df_sql
 
-def data_extractor(prefix, seasonal, geo, m_c, api_key, engine, startyear, 
+def data_extractor(prefix, seasonal, area, m_c, api_key, engine, startyear, 
     endyear, sector = pd.DataFrame()):
     """
     Uses previously defined functions to create batches of series, sends 
@@ -89,9 +89,9 @@ def data_extractor(prefix, seasonal, geo, m_c, api_key, engine, startyear,
     for x in range(0, len(seasonal.index), 1):
         for y in range(0, len(m_c.index), 1):
             for z in range(0, len(sector.index), 1):
-                for i in range(0, len(geo.index), 1):
+                for i in range(0, len(area.index), 1):
                     ser_concat = (prefix + seasonal['seasonal_code'].iloc[x] + 
-                        geo['area_code'].iloc[i] + 
+                        area['area_code'].iloc[i] + 
                         sector['sector_code'].iloc[z] + 
                         m_c['measure_code'].iloc[y])
                     allseries = allseries + (ser_concat,)
@@ -130,7 +130,7 @@ engine.execute("TRUNCATE TABLE incubator")
 
 #Get series code components from CSV
 s_df = pd.read_csv(args.Prefix + "/seasonal_codes.csv")
-geo_df = pd.read_csv(args.Prefix + "/geo_codes.csv",
+area_df = pd.read_csv(args.Prefix + "/area_codes.csv",
     converters={'area_code': lambda x: str(x)})
 mc_df = pd.read_csv(args.Prefix + "/measure_codes.csv",
     converters={'measure_code': lambda x: str(x)})
@@ -139,10 +139,10 @@ mc_df = pd.read_csv(args.Prefix + "/measure_codes.csv",
 try:
     sector_df = pd.read_csv(args.Prefix + "/sector_codes.csv",
         converters={'sector_code': lambda x: str(x)})
-    data_extractor(args.Prefix, s_df, geo_df, mc_df, api_key, engine, 
+    data_extractor(args.Prefix, s_df, area_df, mc_df, api_key, engine, 
         startyear, endyear, sector_df)
 except:
-    data_extractor(args.Prefix, s_df, geo_df, mc_df, api_key, engine, 
+    data_extractor(args.Prefix, s_df, area_df, mc_df, api_key, engine, 
         startyear, endyear)
 
 #Checks that fact and archive tables exist

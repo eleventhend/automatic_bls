@@ -120,7 +120,7 @@ endyear = str(date.today().year)
 #set up empty incubator table
 engine.execute("CREATE TABLE IF NOT EXISTS incubator (`incubator_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
-    datetime, `prefix` varchar(2), `seasonal_code` enum('S','U'), \
+    datetime, `prefix` varchar(2), `seasonal_code` varchar(2), \
     `area_code` varchar(32), `area_code_id` int, \
     `sector_code` varchar(16), `sector_code_id` int, \
     `measure_code` varchar(4), `measure_code_id` int, \
@@ -149,7 +149,7 @@ except:
 #Inserts changed fact entries into the archive table
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`fact_id` int(11) NOT NULL \
     AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
-    `prefix` varchar(2), `seasonal_code` enum('S','U'), \
+    `prefix` varchar(2), `seasonal_code` varchar(2), \
     `area_code` varchar(32), `area_code_id` int, \
     `sector_code` varchar(16), `sector_code_id` int, \
     `measure_code` varchar(4), `measure_code_id` int, \
@@ -157,7 +157,7 @@ engine.execute("CREATE TABLE IF NOT EXISTS fact (`fact_id` int(11) NOT NULL \
     PRIMARY KEY (fact_id))")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
-    datetime, `prefix` varchar(2), `seasonal_code` enum('S','U'), \
+    datetime, `prefix` varchar(2), `seasonal_code` varchar(2), \
     `area_code` varchar(32), `area_code_id` int, \
     `sector_code` varchar(16), `sector_code_id` int, \
     `measure_code` varchar(4), `measure_code_id` int, \

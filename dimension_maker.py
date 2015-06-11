@@ -7,7 +7,8 @@ import numpy as np
 def add_dedupe(df, engine, name):
     """
     add_dedupe appends a given pandas dataframe to a given sql table 
-        (output_table) using a given sqlalchemy engine
+        (output_table) using a given sqlalchemy engine, using an intermediary
+        table (dedupe) to ensure no duplicates are added
     """
     df.insert(0, ('%(oc)s_id' %{"oc": name}), np.nan)
 
@@ -23,23 +24,21 @@ with open ('sql_engine.txt', 'r') as f:
     engine_address = f.read()
 engine = create_engine(engine_address)
 
+#creates series, measure, area, and sector tables
 engine.execute("CREATE TABLE IF NOT EXISTS dimtest_series (`series_id` \
     int(11) NOT NULL AUTO_INCREMENT, `series_code` varchar(64), `prefix` \
-    varchar(2), `prefix_long` varchar(6), `seasonal_code` enum('S','U'), \
+    varchar(2), `prefix_long` varchar(6), `seasonal_code` varchar(2), \
     `seasonal_desc` text, `area_code` varchar(32), `area_code_id` int, \
     `sector_code` varchar(16), `sector_code_id` int, \
     `measure_code` varchar(4), `measure_code_id` int, \
     PRIMARY KEY (`series_id`))")
-
 engine.execute("CREATE TABLE IF NOT EXISTS dimtest_measure \
     (`measure_id` int(11) NOT NULL AUTO_INCREMENT, `measure_code` varchar(2), \
     `measure_text` text, `prefix` varchar(2), PRIMARY KEY (measure_id))")
-
 engine.execute("CREATE TABLE IF NOT EXISTS dimtest_area (`area_id` int(11) \
     NOT NULL AUTO_INCREMENT, `area_type_code` varchar(1), `area_code` \
     varchar(32), `area_text` varchar(64), `state` varchar(2), `prefix` \
     varchar(2), PRIMARY KEY (`area_id`))")
-
 engine.execute("CREATE TABLE IF NOT EXISTS dimtest_sector (`sector_id` \
     int(11) NOT NULL AUTO_INCREMENT, `sector_code` varchar(16), \
     `sector_name` varchar(128), `prefix` varchar(2), PRIMARY KEY \
@@ -92,6 +91,7 @@ for x in range(0, len(prefix.index), 1):
                 else:
                     df_series['sector_code'] = sector['sector_code'].iloc[z]
                 df_series['seasonal_code'] = seasonal['seasonal_code'].iloc[x]
+                df_series['seasonal_desc'] = seasonal['seasonal_text'].iloc[x]
                 df_series['measure_code'] = m_c['measure_code'].iloc[y]
                 add_dedupe(df_series, engine, "series")
     area['prefix'] = p
@@ -99,3 +99,12 @@ for x in range(0, len(prefix.index), 1):
     seasonal['prefix'] = p
     add_dedupe(area, engine, "area")
     add_dedupe(m_c, engine, "measure")
+
+#cross-populates foreign keys
+engine.execute("ALTER TABLE dimtest_series ADD CONSTRAINT fk_area FOREIGN KEY \
+    (area_code_id) REFERENCES dimtest_area(area_id)")
+
+#engine.execute("INSERT INTO `dimtest_series` (`area_code_id`, \
+#    `sector_code_id`, `measure_code_id`) SELECT ar.`area_code_id`, \
+#    sec.`sector_code_id`, me.`measure_code_id` FROM dimtest_area AS ar JOIN \
+#    dimtest_sector AS sec USING (")

@@ -20,7 +20,7 @@ def add_dedupe(df, engine, name):
 
     engine.execute("INSERT INTO %(ot)s SELECT * FROM dedupe AS dd WHERE \
         dd.%(oc)s NOT IN (SELECT %(oc)s FROM %(ot)s AS ot)" 
-        %{"ot": "dimtest_" + name, "oc": name + "_code"})
+        %{"ot": "dim_" + name, "oc": name + "_code"})
 
     return
 
@@ -29,22 +29,22 @@ with open ('sql_engine.txt', 'r') as f:
 engine = create_engine(engine_address)
 
 #creates series, measure, area, and sector tables
-engine.execute("CREATE TABLE IF NOT EXISTS dimtest_series (`series_id` \
+engine.execute("CREATE TABLE IF NOT EXISTS dim_series (`series_id` \
     int(11) NOT NULL AUTO_INCREMENT, `series_code` varchar(64), `prefix` \
-    varchar(2), `prefix_long` varchar(6), `prefix_desc` text, \
+    varchar(4), `prefix_long` varchar(6), `prefix_desc` text, \
     `seasonal_code` varchar(2), `seasonal_desc` text, \
     `area_code` varchar(32), `sector_code` varchar(16), \
     `measure_code` varchar(4), PRIMARY KEY (`series_id`))")
-engine.execute("CREATE TABLE IF NOT EXISTS dimtest_measure \
-    (`measure_id` int(11) NOT NULL AUTO_INCREMENT, `measure_code` varchar(2), \
-    `measure_text` text, `prefix` varchar(2), PRIMARY KEY (measure_id))")
-engine.execute("CREATE TABLE IF NOT EXISTS dimtest_area (`area_id` int(11) \
+engine.execute("CREATE TABLE IF NOT EXISTS dim_measure \
+    (`measure_id` int(11) NOT NULL AUTO_INCREMENT, `measure_code` varchar(4), \
+    `measure_text` text, `prefix` varchar(4), PRIMARY KEY (measure_id))")
+engine.execute("CREATE TABLE IF NOT EXISTS dim_area (`area_id` int(11) \
     NOT NULL AUTO_INCREMENT, `area_type_code` varchar(1), `area_code` \
     varchar(32), `area_text` varchar(64), `state` varchar(2), `prefix` \
     varchar(2), PRIMARY KEY (`area_id`))")
-engine.execute("CREATE TABLE IF NOT EXISTS dimtest_sector (`sector_id` \
+engine.execute("CREATE TABLE IF NOT EXISTS dim_sector (`sector_id` \
     int(11) NOT NULL AUTO_INCREMENT, `sector_code` varchar(16), \
-    `sector_name` varchar(128), `prefix` varchar(2), PRIMARY KEY \
+    `sector_name` varchar(128), `prefix` varchar(4), PRIMARY KEY \
     (`sector_id`))")
 
 prefix = pd.read_csv("prefix.csv")

@@ -49,7 +49,10 @@ def api_to_sql(engine, series, api_key, start_year, end_year):
         #print "Query successful!"
         time.sleep(5)
     except Exception as e:
+        with open('failed_series.txt', 'a') as fs_file:
+            fs_file.write('\n'.join(series))
         with open('errors.txt', 'a') as errorfile:
+            errorfile.write("Error: %s \n" % (e,))
             errorfile.write('\n'.join(series))
             errorfile.write('\n' + api_key)
             errorfile.write('\n' + start_year)

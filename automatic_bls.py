@@ -136,16 +136,6 @@ def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="",
             %{"dx": dimx, "dxj": dx_join})
     return
 
-#cross-populates foreign keys
-cross_populate(engine, "fact", "dimtest_series", "series", "series_code", 
-    "series_id", "series_id", series_run=True)
-cross_populate(engine, "fact", "dimtest_series", "series_id", "series_id", 
-    dimx="dimtest_area", dx_join="area_code", dx_id="area_id")
-cross_populate(engine, "fact", "dimtest_series", "series_id", "series_id", 
-    dimx="dimtest_measure", dx_join="measure_code", dx_id="measure_id")
-cross_populate(engine, "fact", "dimtest_series", "series_id", "series_id", 
-    dimx="dimtest_sector", dx_join="sector_code", dx_id="sector_id")
-
 #Retrieves a single command line argument which determines the target database
 parser = argparse.ArgumentParser()
 parser.add_argument("Prefix", help = "Requires the prefix of the desired \
@@ -163,17 +153,6 @@ engine = create_engine(engine_address)
 startyear = str(date.today().year - 1)
 endyear = str(date.today().year)
 
-#set up empty incubator table
-engine.execute("CREATE TABLE IF NOT EXISTS incubator (`incubator_id` int(11) \
-    NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
-    datetime, `prefix` varchar(2), `seasonal_code` varchar(2), \
-    `area_code` varchar(32), `area_id` int(11), \
-    `sector_code` varchar(16), `sector_id` int(11), \
-    `measure_code` varchar(4), `measure_id` int(11), \
-    `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
-    PRIMARY KEY (incubator_id))")
-engine.execute("TRUNCATE TABLE incubator")
-
 #Get series code components from CSV
 s_df = pd.read_csv(args.Prefix + "/seasonal_codes.csv")
 area_df = pd.read_csv(args.Prefix + "/area_codes.csv",
@@ -182,6 +161,9 @@ mc_df = pd.read_csv(args.Prefix + "/measure_codes.csv",
     converters={'measure_code': lambda x: str(x)})
 
 #If there is a sector file for this database use it; otherwise don't
+#Extraction occurs here--creates and splits the series codes into batches
+#   of 50 series codes and sends them to the API. The returned data is inserted
+#   into the incubator table.
 try:
     sector_df = pd.read_csv(args.Prefix + "/sector_codes.csv",
         converters={'sector_code': lambda x: str(x)})
@@ -191,25 +173,44 @@ except:
     data_extractor(engine, args.Prefix, s_df, area_df, mc_df, api_key, 
         startyear, endyear)
 
+#set up empty incubator table
+engine.execute("CREATE TABLE IF NOT EXISTS incubator (`incubator_id` int(11) \
+    NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
+    datetime, `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
+    `measure_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
+    CURRENT_TIMESTAMP, PRIMARY KEY (incubator_id))")
+engine.execute("TRUNCATE TABLE incubator")
+
 #Checks that fact and archive tables exist
-#Inserts changed fact entries into the archive table
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`fact_id` int(11) NOT NULL \
     AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
-    `prefix` varchar(2), `area_id` int(11), `sector_id` int(11), \
+    `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
     `measure_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
     CURRENT_TIMESTAMP, PRIMARY KEY (fact_id))")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
-    datetime, `prefix` varchar(2), `area_id` int(11), `sector_id` int(11), \
+    datetime, `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
     `measure_id` int(11), `retrieval_date` TIMESTAMP, \
     `archivedate` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
     PRIMARY KEY (archive_id))")
-engine.execute("INSERT INTO archive (`series`, `data`, `date`, `prefix`, \
+
+#Inserts changed fact entries into the archive table
+engine.execute("INSERT INTO archive (`series`, `data`, `date`, `series_id`, \
     `area_id`, `sector_id`, `measure_id`, `retrieval_date`) SELECT \
-    f.`series`, f.`data`, f.`date`, f.`prefix`, f.`area_id`, f.`sector_id`, \
-    f.`measure_id`, f.`retrieval_date`, CURRENT_TIMESTAMP FROM `fact` as f \
-    JOIN `incubator` AS i ON f.`series` = i.`series` AND f.`date` = i.`date` \
-    AND f.`data` != i.`data`")
+    f.`series`, f.`data`, f.`date`, `f.series_id`, f.`area_id`, f.`sector_id`, \
+    f.`measure_id`, f.`retrieval_date` FROM `fact` as f JOIN `incubator` AS i \
+    ON f.`series` = i.`series` AND f.`date` = i.`date` AND \
+    f.`data` != i.`data`")
+
+#cross-populates foreign keys
+cross_populate(engine, "incubator", "dim_series", "series", "series_code", 
+    "series_id", "series_id", series_run=True)
+cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
+    dimx="dim_area", dx_join="area_code", dx_id="area_id")
+cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
+    dimx="dim_measure", dx_join="measure_code", dx_id="measure_id")
+cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
+    dimx="dim_sector", dx_join="sector_code", dx_id="sector_id")
 
 #Creates a sql procedure which checks whether a specific unique index exists,
 #then creates it in the desired table if it does not.
@@ -245,6 +246,8 @@ engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'fact_UQ', \
     'series,date')")
 
 #Inserts incubator entries into fact table, updating data when possible
-engine.execute("INSERT INTO fact (`series`, `data`, `date`) SELECT \
-     i.`series`, i.`data`, i.`date` FROM incubator AS i ON DUPLICATE \
+engine.execute("INSERT INTO fact (`series`, `data`, `date`, `series_id`, \
+    `area_id`, `sector_id`, `measure_id`) SELECT \
+     i.`series`, i.`data`, i.`date`, `i.series_id`, `i.area_id`, \
+     `i.sector_id`, `i.measure_id` FROM incubator AS i ON DUPLICATE \
      KEY UPDATE `data` = VALUES(`data`)")

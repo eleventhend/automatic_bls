@@ -164,11 +164,11 @@ endyear = str(date.today().year)
 engine.execute("CREATE TABLE IF NOT EXISTS incubator (`incubator_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
     datetime, `prefix` varchar(2), `seasonal_code` varchar(2), \
-    `area_code` varchar(32), `area_id` int, \
-    `sector_code` varchar(16), `sector_id` int, \
-    `measure_code` varchar(4), `measure_id` int, \
+    `area_code` varchar(32), `area_id` int(11), \
+    `sector_code` varchar(16), `sector_id` int(11), \
+    `measure_code` varchar(4), `measure_id` int(11), \
     `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
-    PRIMARY KEY (archive_id))")
+    PRIMARY KEY (incubator_id))")
 engine.execute("TRUNCATE TABLE incubator")
 
 #Get series code components from CSV
@@ -192,26 +192,21 @@ except:
 #Inserts changed fact entries into the archive table
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`fact_id` int(11) NOT NULL \
     AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
-    `prefix` varchar(2), `seasonal_code` varchar(2), \
-    `area_code` varchar(32), `area_id` int, \
-    `sector_code` varchar(16), `sector_id` int, \
-    `measure_code` varchar(4), `measure_id` int, \
-    `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
-    PRIMARY KEY (fact_id))")
+    `prefix` varchar(2), `area_id` int(11), `sector_id` int(11), \
+    `measure_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
+    CURRENT_TIMESTAMP, PRIMARY KEY (fact_id))")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
-    datetime, `prefix` varchar(2), `seasonal_code` varchar(2), \
-    `area_code` varchar(32), `area_id` int, \
-    `sector_code` varchar(16), `sector_id` int, \
-    `measure_code` varchar(4), `measure_id` int, \
-    `retrieval_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
+    datetime, `prefix` varchar(2), `area_id` int(11), `sector_id` int(11), \
+    `measure_id` int(11), `retrieval_date` TIMESTAMP, \
     `archivedate` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
     PRIMARY KEY (archive_id))")
-engine.execute("INSERT INTO archive (`series`, `data`, `date`, \
-    `archivedate`) SELECT f.`series`, f.`data`, f.`date`, \
-    CURRENT_TIMESTAMP FROM `fact` as f JOIN `incubator` AS i ON \
-    f.`series` = i.`series` AND f.`date` = i.`date` AND \
-    f.`data` != i.`data`")
+engine.execute("INSERT INTO archive (`series`, `data`, `date`, `prefix`, \
+    `area_id`, `sector_id`, `measure_id`, `retrieval_date`) SELECT \
+    f.`series`, f.`data`, f.`date`, f.`prefix`, f.`area_id`, f.`sector_id`, \
+    f.`measure_id`, f.`retrieval_date`, CURRENT_TIMESTAMP FROM `fact` as f \
+    JOIN `incubator` AS i ON f.`series` = i.`series` AND f.`date` = i.`date` \
+    AND f.`data` != i.`data`")
 
 #Creates a sql procedure which checks whether a specific unique index exists,
 #then creates it in the desired table if it does not.
@@ -247,9 +242,6 @@ engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'fact_UQ', \
     'series,date')")
 
 #Inserts incubator entries into fact table, updating data when possible
-engine.execute("INSERT INTO fact (`series`, `data`, `date`) SELECT"
-    " i.`series`, i.`data`, i.`date` FROM incubator AS i ON DUPLICATE"
-    " KEY UPDATE `data` = VALUES(`data`)")
-
-
-print "to the moon!"
+engine.execute("INSERT INTO fact (`series`, `data`, `date`) SELECT \
+     i.`series`, i.`data`, i.`date` FROM incubator AS i ON DUPLICATE \
+     KEY UPDATE `data` = VALUES(`data`)")

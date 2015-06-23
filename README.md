@@ -78,5 +78,4 @@ http://www.numpy.org/
 
 #####sql_engine.txt
 The SQLAlchemy address to your sql database:
-
 http://docs.sqlalchemy.org/en/latest/core/engines.html

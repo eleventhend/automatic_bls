@@ -7,13 +7,13 @@ Does the following:
 1. Query api based on series read from csv files
 2. Send api data to sql database, updating and archiving deprecated data
 
-1 - Empties out the incubator table
-2 - Sends requests to BLS API for all prefixes listed in prefix.csv
-  2.1 - Takes series components from respective local folders
-  2.2 - Outputs to SQL incubator table using sqlalchemy engine
-3 - Inserts the incubator table into the fact table
-  3.1 - Sends deprecated data to archive table
-  3.2 - Updates fact table with new data
+1. Empties out the incubator table
+2. Sends requests to BLS API for all prefixes listed in prefix.csv
+  1. Takes series components from respective local folders
+  2. Outputs to SQL incubator table using sqlalchemy engine
+3. Inserts the incubator table into the fact table
+  1. Sends deprecated data to archive table
+  2. Updates fact table with new data
 
 ######Note that debugging prints & timers are still in to gauge how the API is handling requests & timeouts
 

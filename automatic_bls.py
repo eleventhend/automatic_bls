@@ -160,6 +160,14 @@ area_df = pd.read_csv(args.Prefix + "/area_codes.csv",
 mc_df = pd.read_csv(args.Prefix + "/measure_codes.csv",
     converters={'measure_code': lambda x: str(x)})
 
+#set up empty incubator table
+engine.execute("CREATE TABLE IF NOT EXISTS incubator (`incubator_id` int(11) \
+    NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
+    datetime, `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
+    `measure_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
+    CURRENT_TIMESTAMP, PRIMARY KEY (incubator_id))")
+engine.execute("TRUNCATE TABLE incubator")
+
 #If there is a sector file for this database use it; otherwise don't
 #Extraction occurs here--creates and splits the series codes into batches
 #   of 50 series codes and sends them to the API. The returned data is inserted
@@ -172,14 +180,6 @@ try:
 except:
     data_extractor(engine, args.Prefix, s_df, area_df, mc_df, api_key, 
         startyear, endyear)
-
-#set up empty incubator table
-engine.execute("CREATE TABLE IF NOT EXISTS incubator (`incubator_id` int(11) \
-    NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
-    datetime, `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
-    `measure_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
-    CURRENT_TIMESTAMP, PRIMARY KEY (incubator_id))")
-engine.execute("TRUNCATE TABLE incubator")
 
 #Checks that fact and archive tables exist
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`fact_id` int(11) NOT NULL \
@@ -197,7 +197,7 @@ engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
 #Inserts changed fact entries into the archive table
 engine.execute("INSERT INTO archive (`series`, `data`, `date`, `series_id`, \
     `area_id`, `sector_id`, `measure_id`, `retrieval_date`) SELECT \
-    f.`series`, f.`data`, f.`date`, `f.series_id`, f.`area_id`, f.`sector_id`, \
+    f.`series`, f.`data`, f.`date`, f.`series_id`, f.`area_id`, f.`sector_id`, \
     f.`measure_id`, f.`retrieval_date` FROM `fact` as f JOIN `incubator` AS i \
     ON f.`series` = i.`series` AND f.`date` = i.`date` AND \
     f.`data` != i.`data`")
@@ -248,6 +248,6 @@ engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'fact_UQ', \
 #Inserts incubator entries into fact table, updating data when possible
 engine.execute("INSERT INTO fact (`series`, `data`, `date`, `series_id`, \
     `area_id`, `sector_id`, `measure_id`) SELECT \
-     i.`series`, i.`data`, i.`date`, `i.series_id`, `i.area_id`, \
-     `i.sector_id`, `i.measure_id` FROM incubator AS i ON DUPLICATE \
+     i.`series`, i.`data`, i.`date`, i.`series_id`, i.`area_id`, \
+     i.`sector_id`, i.`measure_id` FROM incubator AS i ON DUPLICATE \
      KEY UPDATE `data` = VALUES(`data`)")

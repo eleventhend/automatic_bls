@@ -143,7 +143,7 @@ parser.add_argument("Prefix", help = "Requires the prefix of the desired \
 args = parser.parse_args()
 
 #Get API key and SQL engine address (secure info)
-with open ('api_key.txt', 'r') as f:
+with open ('api_key_ferguson.txt', 'r') as f:
     api_key = f.read()
 with open ('sql_engine.txt', 'r') as f:
     engine_address = f.read()

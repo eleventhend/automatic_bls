@@ -39,9 +39,10 @@ engine.execute("CREATE TABLE IF NOT EXISTS dim_measure \
     (`measure_id` int(11) NOT NULL AUTO_INCREMENT, `measure_code` varchar(4), \
     `measure_text` text, `prefix` varchar(4), PRIMARY KEY (measure_id))")
 engine.execute("CREATE TABLE IF NOT EXISTS dim_area (`area_id` int(11) \
-    NOT NULL AUTO_INCREMENT, `area_type_code` varchar(1), `area_code` \
-    varchar(32), `area_text` varchar(64), `state` varchar(2), `prefix` \
-    varchar(2), PRIMARY KEY (`area_id`))")
+    NOT NULL AUTO_INCREMENT, `area_type_code` int(2), `area_code` \
+    varchar(32), `area_text` varchar(64), `state` varchar(2), `state_id` \
+    varchar(2), `area_fips_id` varchar(10), `prefix` varchar(2), \
+    PRIMARY KEY (`area_id`))")
 engine.execute("CREATE TABLE IF NOT EXISTS dim_sector (`sector_id` \
     int(11) NOT NULL AUTO_INCREMENT, `sector_code` varchar(16), \
     `sector_name` varchar(128), `prefix` varchar(4), PRIMARY KEY \
@@ -49,14 +50,18 @@ engine.execute("CREATE TABLE IF NOT EXISTS dim_sector (`sector_id` \
 
 prefix = pd.read_csv("prefix.csv")
 
-df_empty = pd.DataFrame(index = [0], columns = ['series_code', 
+df_empty = pd.DataFrame(index=[0], columns=['series_code', 
     'prefix', 'prefix_long', 'prefix_desc', 'seasonal_code', 'seasonal_desc', 
     'area_code', 'sector_code', 'measure_code'])
 
 for aa in range(0, len(prefix.index), 1):
     p = prefix['prefix'].iloc[aa]
     area = pd.read_csv(p + "/area_codes.csv",
-        converters={'area_code': lambda x: str(x)})
+        converters={
+            'area_code': lambda x: str(x), 
+            'state_id': lambda y: str(y), 
+            'area_fips_id': lambda z: str(z)
+        })
     m_c = pd.read_csv(p + "/measure_codes.csv",
         converters={'measure_code': lambda x: str(x)})
     seasonal = pd.read_csv(p + "/seasonal_codes.csv")
@@ -66,13 +71,13 @@ for aa in range(0, len(prefix.index), 1):
         sector['prefix'] = p
         add_dedupe(sector, engine, "sector")
     except:
-        sector_none = pd.DataFrame(index = [0], columns = ['sector_code', 
+        sector_none = pd.DataFrame(index=[0], columns=['sector_code', 
             'sector_name', 'prefix'])
         sector_none['sector_code'] = "none"
         sector_none['sector_name'] = "default no sector"
         sector_none['prefix'] = p
         add_dedupe(sector_none, engine, "sector")
-        sector = pd.DataFrame(index = [0], columns = ['sector_code'])
+        sector = pd.DataFrame(index=[0], columns=['sector_code'])
         sector = sector.fillna('')
     for x in range(0, len(seasonal.index), 1):
         for y in range(0, len(m_c.index), 1):

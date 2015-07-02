@@ -77,7 +77,7 @@ def dataframe_sequencer(df, i):
     return df_sql
 
 def data_extractor(engine, prefix, seasonal, area, m_c, api_key, startyear, 
-    endyear, sector = pd.DataFrame()):
+    endyear, sector=pd.DataFrame()):
     """
     Uses previously defined functions to create batches of series, sends 
         them to the BLS api, and inserts the returned data to an incubator
@@ -86,7 +86,7 @@ def data_extractor(engine, prefix, seasonal, area, m_c, api_key, startyear,
     try:
         sector['sector_code'].iloc[0]
     except:
-       sector = pd.DataFrame(index = [0], columns = ['sector_code'])
+       sector = pd.DataFrame(index=[0], columns=['sector_code'])
        sector = sector.fillna('')
     allseries = ()
     for x in range(0, len(seasonal.index), 1):
@@ -106,8 +106,12 @@ def data_extractor(engine, prefix, seasonal, area, m_c, api_key, startyear,
 def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="", 
     dimx="", dx_join = "", dx_id = "", series_run=False):
     """
-    Updates a column in the given fact table with the ids from a given 
-        dimension table
+    Updates an id column in the given fact-style table with the ids from a given 
+        dimension table.
+
+    There is a special condition for running this function on the series 
+        dimension table, since all other cross-populations require a join on 
+        the series dimension table as well as the target dimension table.
     """
     if series_run == True:
         engine.execute("CREATE INDEX %(fj)s ON %(f)s(%(fj)s)" 
@@ -137,10 +141,25 @@ def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="",
     return
 
 #Retrieves a single command line argument which determines the target database
-parser = argparse.ArgumentParser()
-parser.add_argument("Prefix", help = "Requires the prefix of the desired \
+parser = argparse.ArgumentParser(description='Retrieve BLS data', 
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("Prefix", help="Requires the prefix of the desired \
     database as an argument")
+parser.add_argument("--start_year", type=int, default=(date.today().year-1), 
+    choices=xrange(1980, date.today().year), 
+    metavar='1980-%(y)i' %{"y": date.today().year},
+    help='Optional - start year for data range.')
+parser.add_argument("--end_year", type=int, default=(date.today().year), 
+    choices=xrange(1980, date.today().year), 
+    metavar='1980-%(y)i' %{"y": date.today().year},
+    help='Optional - end year for data range. Year range cannot exceed 10.')
 args = parser.parse_args()
+startyear = args.start_year
+endyear = args.end_year
+if (endyear-startyear>10):
+    endyear = startyear+10
+startyear = str(startyear)
+endyear = str(endyear)
 
 #Get API key and SQL engine address (secure info)
 with open ('api_key.txt', 'r') as f:
@@ -148,10 +167,8 @@ with open ('api_key.txt', 'r') as f:
 with open ('sql_engine.txt', 'r') as f:
     engine_address = f.read()
 
-#Setup sqlalchemy engine; set start & end year to last year and this year
+#Setup sqlalchemy engine; set start & end year based on arguments
 engine = create_engine(engine_address)
-startyear = str(date.today().year - 1)
-endyear = str(date.today().year)
 
 #Get series code components from CSV
 s_df = pd.read_csv(args.Prefix + "/seasonal_codes.csv")
@@ -193,6 +210,10 @@ engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
     `measure_id` int(11), `retrieval_date` TIMESTAMP, \
     `archivedate` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
     PRIMARY KEY (archive_id))")
+engine.execute("CREATE TABLE IF NOT EXISTS dim_date \
+    (`date_id` int(11) NOT NULL AUTO_INCREMENT, `date` TIMESTAMP, \
+    `year` int(4), `month` int(2), `month_name` varchar(10), \
+    PRIMARY KEY (`date_id`))")
 
 #Inserts changed fact entries into the archive table
 engine.execute("INSERT INTO archive (`series`, `data`, `date`, `series_id`, \
@@ -201,6 +222,12 @@ engine.execute("INSERT INTO archive (`series`, `data`, `date`, `series_id`, \
     f.`measure_id`, f.`retrieval_date` FROM `fact` as f JOIN `incubator` AS i \
     ON f.`series` = i.`series` AND f.`date` = i.`date` AND \
     f.`data` != i.`data`")
+
+engine.execute("INSERT INTO dim_date \
+    (`date`, `year`, `month`, `month_name`) \
+    SELECT i.`date`, YEAR(i.`date`), MONTH(i.`date`), MONTHNAME(i.`date`) \
+    FROM incubator AS i WHERE i.`date` NOT IN \
+    (SELECT `date` FROM dim_date) GROUP BY i.`date`")
 
 #cross-populates foreign keys
 cross_populate(engine, "incubator", "dim_series", "series", "series_code", 
@@ -211,9 +238,12 @@ cross_populate(engine, "incubator", "dim_series", "series_id", "series_id",
     dimx="dim_measure", dx_join="measure_code", dx_id="measure_id")
 cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
     dimx="dim_sector", dx_join="sector_code", dx_id="sector_id")
+cross_populate(engine, "incubator", "dim_date", "`date`", "`date`", 
+    "date_id", "date_id", series_run=True)
 
 #Creates a sql procedure which checks whether a specific unique index exists,
-#then creates it in the desired table if it does not.
+#then creates it in the desired table if it does not. This is necessary for 
+#using "ON DUPLICATE KEY UPDATE" in mysql.
 engine.execute("DROP PROCEDURE IF EXISTS atlas_bls.`CreateIndex`")
 engine.execute("""CREATE PROCEDURE atlas_bls.`CreateIndex`
 (

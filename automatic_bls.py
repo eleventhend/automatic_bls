@@ -110,34 +110,29 @@ def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="",
         dimension table.
 
     There is a special condition for running this function on the series 
-        dimension table, since all other cross-populations require a join on 
-        the series dimension table as well as the target dimension table.
+        dimension table (or date table), since all other cross-populations 
+        require a join on the series dimension table as well as the target 
+        dimension table.
     """
     if series_run == True:
-        engine.execute("CREATE INDEX %(fj)s ON %(f)s(%(fj)s)" 
-            %{"f": fact, "fj": f_join})
-        engine.execute("CREATE INDEX %(dj)s ON %(d)s(%(dj)s)" 
-            %{"d": dim, "dj": d_join})
+        engine.execute("CALL CreateIndex('atlas_bls', '%(f)s', '%(fj)s', \
+            '%(fj)s')" %{"f": fact, "fj": f_join})
+        engine.execute("CALL CreateIndex('atlas_bls', '%(d)s', '%(dj)s', \
+            '%(dj)s')" %{"d": dim, "dj": d_join})
         engine.execute("UPDATE %(f)s f JOIN %(d)s dts ON \
             f.%(fj)s = dts.%(dj)s SET f.%(fi)s = dts.%(di)s" 
             %{"f": fact, "d": dim, "fj": f_join, "dj": d_join, "fi": f_id, 
             "di": d_id})
-        engine.execute("DROP INDEX %(fj)s ON %(f)s" %{"f": fact, "fj": f_join})
-        engine.execute("DROP INDEX %(dj)s ON %(d)s" %{"d": dim, "dj": d_join})
     else:
-        engine.execute("CREATE INDEX %(dxj)s ON %(d)s(%(dxj)s)" 
-            %{"d": dim, "dxj": dx_join})
-        engine.execute("CREATE INDEX %(dxj)s ON %(dx)s(%(dxj)s)" 
-            %{"dx": dimx, "dxj": dx_join})
+        engine.execute("CALL CreateIndex('atlas_bls', '%(d)s', '%(dxj)s', \
+            '%(dxj)s')" %{"d": dim, "dxj": dx_join})
+        engine.execute("CALL CreateIndex('atlas_bls', '%(dx)s', '%(dxj)s', \
+            '%(dxj)s')" %{"dx": dimx, "dxj": dx_join})
         engine.execute("UPDATE %(f)s f JOIN %(d)s dts ON \
             f.%(fj)s = dts.%(dj)s JOIN %(dx)s dtx ON \
             dts.%(dxj)s = dtx.%(dxj)s SET f.%(dxi)s = dtx.%(dxi)s" 
             %{"f": fact, "d": dim, "fj": f_join, "dj": d_join, 
             "dx": dimx, "dxj": dx_join, "dxi": dx_id})
-        engine.execute("DROP INDEX %(dxj)s ON %(d)s" 
-            %{"d": dim, "dxj": dx_join})
-        engine.execute("DROP INDEX %(dxj)s ON %(dx)s" 
-            %{"dx": dimx, "dxj": dx_join})
     return
 
 #Retrieves a single command line argument which determines the target database
@@ -146,11 +141,11 @@ parser = argparse.ArgumentParser(description='Retrieve BLS data',
 parser.add_argument("Prefix", help="Requires the prefix of the desired \
     database as an argument")
 parser.add_argument("--start_year", type=int, default=(date.today().year-1), 
-    choices=xrange(1980, date.today().year), 
-    metavar='1980-%(y)i' %{"y": date.today().year},
+    choices=xrange(1980, (date.today().year)), 
+    metavar='1980-%(y)i' %{"y": (date.today().year-1)},
     help='Optional - start year for data range.')
 parser.add_argument("--end_year", type=int, default=(date.today().year), 
-    choices=xrange(1980, date.today().year), 
+    choices=xrange(1980, (date.today().year+1)), 
     metavar='1980-%(y)i' %{"y": date.today().year},
     help='Optional - end year for data range. Year range cannot exceed 10.')
 args = parser.parse_args()
@@ -181,7 +176,7 @@ mc_df = pd.read_csv(args.Prefix + "/measure_codes.csv",
 engine.execute("CREATE TABLE IF NOT EXISTS incubator (`incubator_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
     datetime, `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
-    `measure_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
+    `measure_id` int(11), `date_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
     CURRENT_TIMESTAMP, PRIMARY KEY (incubator_id))")
 engine.execute("TRUNCATE TABLE incubator")
 
@@ -202,48 +197,39 @@ except:
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`fact_id` int(11) NOT NULL \
     AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
     `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
-    `measure_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
+    `measure_id` int(11), `date_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
     CURRENT_TIMESTAMP, PRIMARY KEY (fact_id))")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
     datetime, `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
-    `measure_id` int(11), `retrieval_date` TIMESTAMP, \
+    `measure_id` int(11), `date_id` int(11), `retrieval_date` TIMESTAMP, \
     `archivedate` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \
     PRIMARY KEY (archive_id))")
-engine.execute("CREATE TABLE IF NOT EXISTS dim_date \
-    (`date_id` int(11) NOT NULL AUTO_INCREMENT, `date` TIMESTAMP, \
-    `year` int(4), `month` int(2), `month_name` varchar(10), \
-    PRIMARY KEY (`date_id`))")
-
 #Inserts changed fact entries into the archive table
 engine.execute("INSERT INTO archive (`series`, `data`, `date`, `series_id`, \
-    `area_id`, `sector_id`, `measure_id`, `retrieval_date`) SELECT \
+    `area_id`, `sector_id`, `measure_id`, `date_id`, `retrieval_date`) SELECT \
     f.`series`, f.`data`, f.`date`, f.`series_id`, f.`area_id`, f.`sector_id`, \
-    f.`measure_id`, f.`retrieval_date` FROM `fact` as f JOIN `incubator` AS i \
-    ON f.`series` = i.`series` AND f.`date` = i.`date` AND \
+    f.`measure_id`, f.`date_id`, f.`retrieval_date` FROM `fact` as f JOIN \
+    `incubator` AS i ON f.`series` = i.`series` AND f.`date` = i.`date` AND \
     f.`data` != i.`data`")
 
+#Inserts date data into date dimension table
+engine.execute("CREATE TABLE IF NOT EXISTS dim_date \
+    (`date_id` int(11) NOT NULL AUTO_INCREMENT, `date_full` TIMESTAMP, \
+    `year` int(4), `month` int(2), `month_name` varchar(10), \
+    PRIMARY KEY (`date_id`))")
 engine.execute("INSERT INTO dim_date \
-    (`date`, `year`, `month`, `month_name`) \
+    (`date_full`, `year`, `month`, `month_name`) \
     SELECT i.`date`, YEAR(i.`date`), MONTH(i.`date`), MONTHNAME(i.`date`) \
     FROM incubator AS i WHERE i.`date` NOT IN \
     (SELECT `date` FROM dim_date) GROUP BY i.`date`")
 
-#cross-populates foreign keys
-cross_populate(engine, "incubator", "dim_series", "series", "series_code", 
-    "series_id", "series_id", series_run=True)
-cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
-    dimx="dim_area", dx_join="area_code", dx_id="area_id")
-cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
-    dimx="dim_measure", dx_join="measure_code", dx_id="measure_id")
-cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
-    dimx="dim_sector", dx_join="sector_code", dx_id="sector_id")
-cross_populate(engine, "incubator", "dim_date", "`date`", "`date`", 
-    "date_id", "date_id", series_run=True)
-
-#Creates a sql procedure which checks whether a specific unique index exists,
-#then creates it in the desired table if it does not. This is necessary for 
-#using "ON DUPLICATE KEY UPDATE" in mysql.
+"""
+Creates a sql procedure which checks whether a specific unique index exists,
+then creates it in the desired table if it does not. This is necessary for 
+using "ON DUPLICATE KEY UPDATE" in MySQL. As of June 2015 there is no existing 
+MySQL function which could replace this procedure.
+"""
 engine.execute("DROP PROCEDURE IF EXISTS atlas_bls.`CreateIndex`")
 engine.execute("""CREATE PROCEDURE atlas_bls.`CreateIndex`
 (
@@ -275,9 +261,33 @@ END""")
 engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'fact_UQ', \
     'series,date')")
 
+#cross-populates foreign keys
+cross_populate(engine, "incubator", "dim_series", "series", "series_code", 
+    "series_id", "series_id", series_run=True)
+cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
+    dimx="dim_area", dx_join="area_code", dx_id="area_id")
+cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
+    dimx="dim_measure", dx_join="measure_code", dx_id="measure_id")
+cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
+    dimx="dim_sector", dx_join="sector_code", dx_id="sector_id")
+cross_populate(engine, "incubator", "dim_date", "`date`", "`date_full`", 
+    "date_id", "date_id", series_run=True)
+
 #Inserts incubator entries into fact table, updating data when possible
 engine.execute("INSERT INTO fact (`series`, `data`, `date`, `series_id`, \
-    `area_id`, `sector_id`, `measure_id`) SELECT \
+    `area_id`, `sector_id`, `measure_id`, `date_id`) SELECT \
      i.`series`, i.`data`, i.`date`, i.`series_id`, i.`area_id`, \
-     i.`sector_id`, i.`measure_id` FROM incubator AS i ON DUPLICATE \
-     KEY UPDATE `data` = VALUES(`data`)")
+     i.`sector_id`, i.`measure_id`, i.`date_id` FROM incubator AS i \
+     ON DUPLICATE KEY UPDATE `data` = VALUES(`data`)")
+"""
+engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'series_id, \
+    'series_id')")
+engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'area_id', \
+    'area_id')")
+engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'sector_id', \
+    'sector_id')")
+engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'measure_id', \
+    'measure_id')")
+engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'date_id', \
+    'date_id')")
+"""

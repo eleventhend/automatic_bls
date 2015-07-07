@@ -41,3 +41,6 @@ sql_engine.txt
 failed_series.txt
 type_errors.txt
 errors.txt
+testbed.py
+area_codes_test.csv
+area_codes_old.csv

@@ -51,6 +51,7 @@ def api_to_sql(engine, series, api_key, start_year, end_year):
     except Exception as e:
         with open('failed_series.txt', 'a') as fs_file:
             fs_file.write('\n'.join(series))
+            fs_file.write('\n')
         with open('errors.txt', 'a') as errorfile:
             errorfile.write("Error: %s \n" % (e,))
             errorfile.write('\n'.join(series))
@@ -103,39 +104,50 @@ def data_extractor(engine, prefix, seasonal, area, m_c, api_key, startyear,
         api_to_sql(engine, series[i], api_key, startyear, endyear)
     return
 
+def create_index(engine, table, index, column):
+    table_x = "'" + table + "'"
+    index_x = "'" + index + "'"
+    result = engine.execute(
+        """SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE table_schema = 'atlas_bls'
+        AND table_name = %(t)s AND index_name = %(i)s;""" 
+        %{"t": table_x, "i": index_x})
+
+    index_exists = result.fetchall()
+    if index_exists[0][0] == 0:
+        engine.execute("CREATE INDEX %(i)s ON atlas_bls.%(t)s(%(c)s)"
+            %{"t": table, "i": index, "c": column})
+    return
+
 def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="", 
     dimx="", dx_join = "", dx_id = "", series_run=False):
     """
     Updates an id column in the given fact-style table with the ids from a given 
         dimension table.
-
     There is a special condition for running this function on the series 
         dimension table (or date table), since all other cross-populations 
         require a join on the series dimension table as well as the target 
         dimension table.
     """
     if series_run == True:
-        engine.execute("CALL CreateIndex('atlas_bls', '%(f)s', '%(fj)s', \
-            '%(fj)s')" %{"f": fact, "fj": f_join})
-        engine.execute("CALL CreateIndex('atlas_bls', '%(d)s', '%(dj)s', \
-            '%(dj)s')" %{"d": dim, "dj": d_join})
-        engine.execute("UPDATE %(f)s f JOIN %(d)s dts ON \
-            f.%(fj)s = dts.%(dj)s SET f.%(fi)s = dts.%(di)s" 
+        create_index(engine, fact, f_join, f_join)
+        create_index(engine, dim, d_join, d_join)
+        engine.execute("""UPDATE %(f)s f JOIN %(d)s dts ON \
+            f.%(fj)s = dts.%(dj)s SET f.%(fi)s = dts.%(di)s""" 
             %{"f": fact, "d": dim, "fj": f_join, "dj": d_join, "fi": f_id, 
             "di": d_id})
     else:
-        engine.execute("CALL CreateIndex('atlas_bls', '%(d)s', '%(dxj)s', \
-            '%(dxj)s')" %{"d": dim, "dxj": dx_join})
-        engine.execute("CALL CreateIndex('atlas_bls', '%(dx)s', '%(dxj)s', \
-            '%(dxj)s')" %{"dx": dimx, "dxj": dx_join})
-        engine.execute("UPDATE %(f)s f JOIN %(d)s dts ON \
+        create_index(engine, dim, d_join, d_join)
+        create_index(engine, dimx, dx_join, dx_join)
+        engine.execute("""UPDATE %(f)s f JOIN %(d)s dts ON \
             f.%(fj)s = dts.%(dj)s JOIN %(dx)s dtx ON \
-            dts.%(dxj)s = dtx.%(dxj)s SET f.%(dxi)s = dtx.%(dxi)s" 
+            dts.%(dxj)s = dtx.%(dxj)s SET f.%(dxi)s = dtx.%(dxi)s""" 
             %{"f": fact, "d": dim, "fj": f_join, "dj": d_join, 
             "dx": dimx, "dxj": dx_join, "dxi": dx_id})
     return
 
-#Retrieves a single command line argument which determines the target database
+
+#Retrieves command line arguments which determine the target database and years
 parser = argparse.ArgumentParser(description='Retrieve BLS data', 
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("Prefix", help="Requires the prefix of the desired \
@@ -209,7 +221,7 @@ engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
 engine.execute("INSERT INTO archive (`series`, `data`, `date`, `series_id`, \
     `area_id`, `sector_id`, `measure_id`, `date_id`, `retrieval_date`) SELECT \
     f.`series`, f.`data`, f.`date`, f.`series_id`, f.`area_id`, f.`sector_id`, \
-    f.`measure_id`, f.`date_id`, f.`retrieval_date` FROM `fact` as f JOIN \
+    f.`measure_id`, f.`date_id`, f.`retrieval_date` FROM `fact` AS f JOIN \
     `incubator` AS i ON f.`series` = i.`series` AND f.`date` = i.`date` AND \
     f.`data` != i.`data`")
 
@@ -222,44 +234,10 @@ engine.execute("INSERT INTO dim_date \
     (`date_full`, `year`, `month`, `month_name`) \
     SELECT i.`date`, YEAR(i.`date`), MONTH(i.`date`), MONTHNAME(i.`date`) \
     FROM incubator AS i WHERE i.`date` NOT IN \
-    (SELECT `date` FROM dim_date) GROUP BY i.`date`")
-
-"""
-Creates a sql procedure which checks whether a specific unique index exists,
-then creates it in the desired table if it does not. This is necessary for 
-using "ON DUPLICATE KEY UPDATE" in MySQL. As of June 2015 there is no existing 
-MySQL function which could replace this procedure.
-"""
-engine.execute("DROP PROCEDURE IF EXISTS atlas_bls.`CreateIndex`")
-engine.execute("""CREATE PROCEDURE atlas_bls.`CreateIndex`
-(
-    g_db    VARCHAR(64),
-    g_table VARCHAR(64),
-    g_index VARCHAR(64),
-    g_col   VARCHAR(64)
-)
-BEGIN
-    DECLARE IndexExists INTEGER;
-    SELECT COUNT(1) INTO IndexExists
-    FROM INFORMATION_SCHEMA.STATISTICS
-    WHERE table_schema = g_db
-    AND table_name = g_table
-    AND index_name = g_index;
-    
-    IF IndexExists = 0 THEN
-        SET @sqlstmt = CONCAT('CREATE INDEX ', g_index, ' ON ', g_db, '.', \
-            g_table, ' (', g_col, ')');
-        PREPARE st FROM @sqlstmt;
-        EXECUTE st;
-        DEALLOCATE PREPARE st;
-    ELSE
-        SELECT CONCAT('Index ', g_index, ' exists.') CreateindexErrorMessage;
-    END IF;
-END""")
+    (SELECT `date_full` FROM dim_date) GROUP BY i.`date`")
 
 #Creates unique index needed for 'insert into ... on duplicate key update'
-engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'fact_UQ', \
-    'series,date')")
+create_index(engine, "fact", "fact_UQ", "series, date")
 
 #cross-populates foreign keys
 cross_populate(engine, "incubator", "dim_series", "series", "series_code", 
@@ -270,7 +248,7 @@ cross_populate(engine, "incubator", "dim_series", "series_id", "series_id",
     dimx="dim_measure", dx_join="measure_code", dx_id="measure_id")
 cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
     dimx="dim_sector", dx_join="sector_code", dx_id="sector_id")
-cross_populate(engine, "incubator", "dim_date", "`date`", "`date_full`", 
+cross_populate(engine, "incubator", "dim_date", "date", "date_full", 
     "date_id", "date_id", series_run=True)
 
 #Inserts incubator entries into fact table, updating data when possible
@@ -279,15 +257,9 @@ engine.execute("INSERT INTO fact (`series`, `data`, `date`, `series_id`, \
      i.`series`, i.`data`, i.`date`, i.`series_id`, i.`area_id`, \
      i.`sector_id`, i.`measure_id`, i.`date_id` FROM incubator AS i \
      ON DUPLICATE KEY UPDATE `data` = VALUES(`data`)")
-"""
-engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'series_id, \
-    'series_id')")
-engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'area_id', \
-    'area_id')")
-engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'sector_id', \
-    'sector_id')")
-engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'measure_id', \
-    'measure_id')")
-engine.execute("CALL CreateIndex('atlas_bls', 'fact', 'date_id', \
-    'date_id')")
-"""
+
+create_index(engine, "fact", "series_id", "series_id")
+create_index(engine, "fact", "area_id", "area_id")
+create_index(engine, "fact", "sector_id", "sector_id")
+create_index(engine, "fact", "measure_id", "measure_id")
+create_index(engine, "fact", "date_id", "date_id")

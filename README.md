@@ -26,12 +26,17 @@ Does the following:
 #####Requires command line argument of desired database prefix. Current arguments include:
 
 `$ python automatic_bls.py LA`
-
 `$ python automatic_bls.py SM`
+
+#####Optional arguments:
+
+`--start_year [1980-2015 default=last year]`
+`--end_year [1980-2015 default=current year]`
 
 #####Future arguments will include:
 
 `$ python automatic_bls.py EN`
+
 
 ###Requirements
 

@@ -210,7 +210,8 @@ engine.execute("CREATE TABLE IF NOT EXISTS fact (`fact_id` int(11) NOT NULL \
     AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
     `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
     `measure_id` int(11), `date_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
-    CURRENT_TIMESTAMP, PRIMARY KEY (fact_id))")
+    CURRENT_TIMESTAMP, PRIMARY KEY (fact_id), \
+    CONSTRAINT fact_UQ UNIQUE (series_id, date_id))")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
     datetime, `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
@@ -235,9 +236,6 @@ engine.execute("INSERT INTO dim_date \
     SELECT i.`date`, YEAR(i.`date`), MONTH(i.`date`), MONTHNAME(i.`date`) \
     FROM incubator AS i WHERE i.`date` NOT IN \
     (SELECT `date_full` FROM dim_date) GROUP BY i.`date`")
-
-#Creates unique index needed for 'insert into ... on duplicate key update'
-create_index(engine, "fact", "fact_UQ", "series, date")
 
 #cross-populates foreign keys
 cross_populate(engine, "incubator", "dim_series", "series", "series_code", 

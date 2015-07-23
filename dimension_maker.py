@@ -4,23 +4,23 @@ from sqlalchemy import create_engine
 import pandas as pd
 import numpy as np
 
-def add_dedupe(df, engine, name):
+def add_dedupe(df, engine, table, unique, id_name):
     """
-    add_dedupe appends a given pandas dataframe to a given sql table 
-        (output_table) using a given sqlalchemy engine, using an intermediary
+    add_dedupe appends a given pandas dataframe to a given sql table: 
+        table using a given sqlalchemy engine, using an intermediary
         table (dedupe) to ensure no duplicates are added.
     Inserts a column:
-        name + '_id'
+        id_name
     which is populated with nan to allow receiving sql table to populate 
         a unique primary key for each added dimension via auto_increment
     """
-    df.insert(0, ('%(oc)s_id' %{"oc": name}), np.nan)
+    df.insert(0, ('%(id_name)s' %{"id_name": id_name}), np.nan)
 
     df.to_sql(name="dedupe", con=engine, if_exists='replace', index=False)
 
-    engine.execute("INSERT INTO %(ot)s SELECT * FROM dedupe AS dd WHERE \
-        dd.%(oc)s NOT IN (SELECT %(oc)s FROM %(ot)s AS ot)" 
-        %{"ot": "dim_" + name, "oc": name + "_code"})
+    engine.execute("INSERT INTO %(table)s SELECT * FROM dedupe AS dd \
+        WHERE dd.%(unique)s NOT IN (SELECT %(unique)s FROM %(table)s AS dim)" 
+        %{"table": table, "unique": unique})
 
     return
 
@@ -69,14 +69,14 @@ for aa in range(0, len(prefix.index), 1):
         sector = pd.read_csv(p + "/sector_codes.csv",
             converters={'sector_code': lambda x: str(x)})
         sector['prefix'] = p
-        add_dedupe(sector, engine, "sector")
+        add_dedupe(sector, engine, "dim_sector", "sector_code", "sector_id")
     except:
         sector_none = pd.DataFrame(index=[0], columns=['sector_code', 
             'sector_name', 'prefix'])
         sector_none['sector_code'] = "none"
         sector_none['sector_name'] = "default no sector"
         sector_none['prefix'] = p
-        add_dedupe(sector_none, engine, "sector")
+        add_dedupe(sector_none, engine, "dim_sector", "sector_code", "sector_id")
         sector = pd.DataFrame(index=[0], columns=['sector_code'])
         sector = sector.fillna('')
     for x in range(0, len(seasonal.index), 1):
@@ -102,9 +102,9 @@ for aa in range(0, len(prefix.index), 1):
                 df_series['seasonal_code'] = seasonal['seasonal_code'].iloc[x]
                 df_series['seasonal_desc'] = seasonal['seasonal_text'].iloc[x]
                 df_series['measure_code'] = m_c['measure_code'].iloc[y]
-                add_dedupe(df_series, engine, "series")
+                add_dedupe(df_series, engine, "dim_series", "series_code", "series_id")
     area['prefix'] = p
     m_c['prefix'] = p
     seasonal['prefix'] = p
-    add_dedupe(area, engine, "area")
-    add_dedupe(m_c, engine, "measure")
+    add_dedupe(area, engine, "dim_area", "area_code", "area_id")
+    add_dedupe(m_c, engine, "dim_measure", "measure_text", "measure_id")

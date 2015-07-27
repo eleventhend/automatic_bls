@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 import pandas as pd
 import numpy as np
 
-def add_dedupe(df, engine, table, unique, id_name):
+def add_dedupe(df, engine, table, uniques, id_name):
     """
     add_dedupe appends a given pandas dataframe to a given sql table: 
         table using a given sqlalchemy engine, using an intermediary
@@ -18,9 +18,9 @@ def add_dedupe(df, engine, table, unique, id_name):
 
     df.to_sql(name="dedupe", con=engine, if_exists='replace', index=False)
 
-    engine.execute("INSERT INTO %(table)s SELECT * FROM dedupe AS dd \
-        WHERE dd.%(unique)s NOT IN (SELECT %(unique)s FROM %(table)s AS dim)" 
-        %{"table": table, "unique": unique})
+    engine.execute("INSERT INTO %(table)s SELECT * FROM dedupe \
+        WHERE (%(uniques)s) NOT IN (SELECT %(uniques)s FROM %(table)s)" 
+        %{"table": table, "uniques": uniques})
 
     return
 
@@ -34,7 +34,8 @@ engine.execute("CREATE TABLE IF NOT EXISTS dim_series (`series_id` \
     varchar(4), `prefix_long` varchar(6), `prefix_desc` text, \
     `seasonal_code` varchar(2), `seasonal_desc` text, \
     `area_code` varchar(32), `sector_code` varchar(16), \
-    `measure_code` varchar(4), PRIMARY KEY (`series_id`))")
+    `sector_text` varchar(128), `measure_code` varchar(4), \
+    `measure_text` varchar(128), PRIMARY KEY (`series_id`))")
 engine.execute("CREATE TABLE IF NOT EXISTS dim_measure \
     (`measure_id` int(11) NOT NULL AUTO_INCREMENT, `measure_code` varchar(4), \
     `measure_text` text, `prefix` varchar(4), PRIMARY KEY (measure_id))")
@@ -45,14 +46,14 @@ engine.execute("CREATE TABLE IF NOT EXISTS dim_area (`area_id` int(11) \
     PRIMARY KEY (`area_id`))")
 engine.execute("CREATE TABLE IF NOT EXISTS dim_sector (`sector_id` \
     int(11) NOT NULL AUTO_INCREMENT, `sector_code` varchar(16), \
-    `sector_name` varchar(128), `prefix` varchar(4), PRIMARY KEY \
+    `sector_text` varchar(128), `prefix` varchar(4), PRIMARY KEY \
     (`sector_id`))")
 
 prefix = pd.read_csv("prefix.csv")
 
 df_empty = pd.DataFrame(index=[0], columns=['series_code', 
     'prefix', 'prefix_long', 'prefix_desc', 'seasonal_code', 'seasonal_desc', 
-    'area_code', 'sector_code', 'measure_code'])
+    'area_code', 'sector_code', 'sector_text', 'measure_code', 'measure_text'])
 
 for aa in range(0, len(prefix.index), 1):
     p = prefix['prefix'].iloc[aa]
@@ -69,14 +70,14 @@ for aa in range(0, len(prefix.index), 1):
         sector = pd.read_csv(p + "/sector_codes.csv",
             converters={'sector_code': lambda x: str(x)})
         sector['prefix'] = p
-        add_dedupe(sector, engine, "dim_sector", "sector_code", "sector_id")
+        add_dedupe(sector, engine, "dim_sector", "sector_code, sector_text", "sector_id")
     except:
         sector_none = pd.DataFrame(index=[0], columns=['sector_code', 
-            'sector_name', 'prefix'])
+            'sector_text', 'prefix'])
         sector_none['sector_code'] = "none"
-        sector_none['sector_name'] = "default no sector"
-        sector_none['prefix'] = p
-        add_dedupe(sector_none, engine, "dim_sector", "sector_code", "sector_id")
+        sector_none['sector_text'] = "default no sector"
+        #sector_none['prefix'] = p
+        add_dedupe(sector_none, engine, "dim_sector", "sector_code, sector_text", "sector_id")
         sector = pd.DataFrame(index=[0], columns=['sector_code'])
         sector = sector.fillna('')
     for x in range(0, len(seasonal.index), 1):
@@ -97,14 +98,17 @@ for aa in range(0, len(prefix.index), 1):
                 df_series['prefix_desc'] = prefix['prefix_desc'].iloc[aa]
                 if sector['sector_code'].iloc[z] == '':
                     df_series['sector_code'] = 'none'
+                    df_series['sector_text'] = 'default no sector'
                 else:
                     df_series['sector_code'] = sector['sector_code'].iloc[z]
+                    df_series['sector_text'] = sector['sector_text'].iloc[z]
                 df_series['seasonal_code'] = seasonal['seasonal_code'].iloc[x]
                 df_series['seasonal_desc'] = seasonal['seasonal_text'].iloc[x]
                 df_series['measure_code'] = m_c['measure_code'].iloc[y]
+                df_series['measure_text'] = m_c['measure_text'].iloc[y]
                 add_dedupe(df_series, engine, "dim_series", "series_code", "series_id")
     area['prefix'] = p
     m_c['prefix'] = p
     seasonal['prefix'] = p
-    add_dedupe(area, engine, "dim_area", "area_code", "area_id")
-    add_dedupe(m_c, engine, "dim_measure", "measure_text", "measure_id")
+    add_dedupe(area, engine, "dim_area", "area_code, area_text", "area_id")
+    add_dedupe(m_c, engine, "dim_measure", "measure_code, measure_text", "measure_id")

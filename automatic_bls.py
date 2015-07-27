@@ -105,13 +105,11 @@ def data_extractor(engine, prefix, seasonal, area, m_c, api_key, startyear,
     return
 
 def create_index(engine, table, index, column):
-    table_x = "'" + table + "'"
-    index_x = "'" + index + "'"
     result = engine.execute(
         """SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS
         WHERE table_schema = 'atlas_bls'
         AND table_name = %(t)s AND index_name = %(i)s;""" 
-        %{"t": table_x, "i": index_x})
+        %{"t": "'" + table + "'", "i": "'" + index + "'"})
 
     index_exists = result.fetchall()
     if index_exists[0][0] == 0:
@@ -243,9 +241,9 @@ cross_populate(engine, "incubator", "dim_series", "series", "series_code",
 cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
     dimx="dim_area", dx_join="area_code", dx_id="area_id")
 cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
-    dimx="dim_measure", dx_join="measure_code", dx_id="measure_id")
+    dimx="dim_measure", dx_join="measure_text", dx_id="measure_id")
 cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
-    dimx="dim_sector", dx_join="sector_code", dx_id="sector_id")
+    dimx="dim_sector", dx_join="sector_text", dx_id="sector_id")
 cross_populate(engine, "incubator", "dim_date", "date", "date_full", 
     "date_id", "date_id", series_run=True)
 

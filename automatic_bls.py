@@ -46,7 +46,6 @@ def api_to_sql(engine, series, api_key, start_year, end_year):
             df_sql = dataframe_sequencer(df, k)
             df_sql.to_sql(con=engine, name='incubator', if_exists='append', 
                 index=False)
-        #print "Query successful!"
         time.sleep(5)
     except Exception as e:
         with open('failed_series.txt', 'a') as fs_file:
@@ -60,7 +59,6 @@ def api_to_sql(engine, series, api_key, start_year, end_year):
             errorfile.write('\n' + end_year + '\n')
         with open ('type_errors.txt', 'a') as te_file:
             te_file.write("Error: %s \n" % (e,))
-        #print "Query failed, waiting 5 seconds"
         time.sleep(5)
         return
     return
@@ -83,6 +81,7 @@ def data_extractor(engine, prefix, seasonal, area, m_c, api_key, startyear,
     Uses previously defined functions to create batches of series, sends 
         them to the BLS api, and inserts the returned data to an incubator
         table in the SQL server.
+    Nested FOR loops are used to create all possible series code combinations
     """
     try:
         sector['sector_code'].iloc[0]
@@ -120,8 +119,8 @@ def create_index(engine, table, index, column):
 def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="", 
     dimx="", dx_join = "", dx_id = "", series_run=False):
     """
-    Updates an id column in the given fact-style table with the ids from a given 
-        dimension table.
+    Updates an id column in the given fact-style table with the ids from a 
+        given dimension table.
     There is a special condition for running this function on the series 
         dimension table (or date table), since all other cross-populations 
         require a join on the series dimension table as well as the target 
@@ -145,7 +144,8 @@ def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="",
     return
 
 
-#Retrieves command line arguments which determine the target database and years
+#Creates and retrieves command line arguments
+#which determine the target database and year range
 parser = argparse.ArgumentParser(description='Retrieve BLS data', 
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("Prefix", help="Requires the prefix of the desired \
@@ -161,6 +161,7 @@ parser.add_argument("--end_year", type=int, default=(date.today().year),
 args = parser.parse_args()
 startyear = args.start_year
 endyear = args.end_year
+#Ensures year range is confined to 10 years; converts inputs to strings
 if (endyear-startyear>10):
     endyear = startyear+10
 startyear = str(startyear)
@@ -172,7 +173,7 @@ with open ('api_key.txt', 'r') as f:
 with open ('sql_engine.txt', 'r') as f:
     engine_address = f.read()
 
-#Setup sqlalchemy engine; set start & end year based on arguments
+#set up sqlalchemy engine
 engine = create_engine(engine_address)
 
 #Get series code components from CSV
@@ -186,14 +187,17 @@ mc_df = pd.read_csv(args.Prefix + "/measure_codes.csv",
 engine.execute("CREATE TABLE IF NOT EXISTS incubator (`incubator_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
     datetime, `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
-    `measure_id` int(11), `date_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
-    CURRENT_TIMESTAMP, PRIMARY KEY (incubator_id))")
+    `measure_id` int(11), `date_id` int(11), `retrieval_date` TIMESTAMP \
+    DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (incubator_id))")
 engine.execute("TRUNCATE TABLE incubator")
 
-#If there is a sector file for this database use it; otherwise don't
-#Extraction occurs here--creates and splits the series codes into batches
-#   of 50 series codes and sends them to the API. The returned data is inserted
-#   into the incubator table.
+"""
+If there is a sector file for this database, it is read in and used
+If there is no sector file, no sector input is used
+Extraction occurs here--creates and splits the series codes into batches
+   of 50 series codes and sends them to the API. The returned data is inserted
+   into the incubator table.
+"""
 try:
     sector_df = pd.read_csv(args.Prefix + "/sector_codes.csv",
         converters={'sector_code': lambda x: str(x)})
@@ -207,8 +211,8 @@ except:
 engine.execute("CREATE TABLE IF NOT EXISTS fact (`fact_id` int(11) NOT NULL \
     AUTO_INCREMENT, `series` varchar(64), `data` float, `date` datetime, \
     `series_id` int(11), `area_id` int(11), `sector_id` int(11), \
-    `measure_id` int(11), `date_id` int(11), `retrieval_date` TIMESTAMP DEFAULT \
-    CURRENT_TIMESTAMP, PRIMARY KEY (fact_id), \
+    `measure_id` int(11), `date_id` int(11), `retrieval_date` TIMESTAMP \
+    DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (fact_id), \
     CONSTRAINT fact_UQ UNIQUE (series_id, date_id))")
 engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
     NOT NULL AUTO_INCREMENT, `series` varchar(64), `data` float, `date` \
@@ -219,12 +223,12 @@ engine.execute("CREATE TABLE IF NOT EXISTS archive (`archive_id` int(11) \
 #Inserts changed fact entries into the archive table
 engine.execute("INSERT INTO archive (`series`, `data`, `date`, `series_id`, \
     `area_id`, `sector_id`, `measure_id`, `date_id`, `retrieval_date`) SELECT \
-    f.`series`, f.`data`, f.`date`, f.`series_id`, f.`area_id`, f.`sector_id`, \
-    f.`measure_id`, f.`date_id`, f.`retrieval_date` FROM `fact` AS f JOIN \
-    `incubator` AS i ON f.`series` = i.`series` AND f.`date` = i.`date` AND \
-    f.`data` != i.`data`")
+    f.`series`, f.`data`, f.`date`, f.`series_id`, f.`area_id`, \
+    f.`sector_id`, f.`measure_id`, f.`date_id`, f.`retrieval_date` \
+    FROM `fact` AS f JOIN `incubator` AS i ON f.`series` = i.`series` \
+    AND f.`date` = i.`date` AND f.`data` != i.`data`")
 
-#Inserts date data into date dimension table
+#Checks that date table exists; inserts date data into date dimension table
 engine.execute("CREATE TABLE IF NOT EXISTS dim_date \
     (`date_id` int(11) NOT NULL AUTO_INCREMENT, `date_full` TIMESTAMP, \
     `year` int(4), `month` int(2), `month_name` varchar(10), \
@@ -235,7 +239,7 @@ engine.execute("INSERT INTO dim_date \
     FROM incubator AS i WHERE i.`date` NOT IN \
     (SELECT `date_full` FROM dim_date) GROUP BY i.`date`")
 
-#cross-populates foreign keys
+#cross-populates foreign keys to fact table from all dimension tables
 cross_populate(engine, "incubator", "dim_series", "series", "series_code", 
     "series_id", "series_id", series_run=True)
 cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
@@ -254,6 +258,7 @@ engine.execute("INSERT INTO fact (`series`, `data`, `date`, `series_id`, \
      i.`sector_id`, i.`measure_id`, i.`date_id` FROM incubator AS i \
      ON DUPLICATE KEY UPDATE `data` = VALUES(`data`)")
 
+#creates indexes in fact table where needed
 create_index(engine, "fact", "series_id", "series_id")
 create_index(engine, "fact", "area_id", "area_id")
 create_index(engine, "fact", "sector_id", "sector_id")

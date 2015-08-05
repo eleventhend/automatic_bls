@@ -145,7 +145,7 @@ def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="",
 
 
 #Creates and retrieves command line arguments
-#which determine the target database and year range
+#which determine the target dataset and year range
 parser = argparse.ArgumentParser(description='Retrieve BLS data', 
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("Prefix", help="Requires the prefix of the desired \

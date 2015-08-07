@@ -10,6 +10,31 @@ Making BLS data accessible since May 2015.
 4. Run dimension_maker.py
 5. Run automatic_bls.py for each desired database
 
+##dimension_maker.py
+Does the following:
+
+1. Constructs dimension tables for: series, measure, geographic, and sector codes.
+2. Fills these dimension tables with all available codes and descriptions for all prefixes in the prefix file.
+3. Creates a unique ID for each entry using the MySQL autoincrement function.
+
+
+###Requirements
+#####SQLAlchemy
+http://docs.sqlalchemy.org/en/latest/intro.html#installation-guide
+
+#####pandas
+http://pandas.pydata.org/pandas-docs/stable/install.html
+
+#####numpy
+http://www.numpy.org/
+
+####In directory:
+
+#####sql_engine.txt
+The SQLAlchemy address to your sql database:
+http://docs.sqlalchemy.org/en/latest/core/engines.html
+
+
 ##Automatic_bls.py
 Does the following:
 
@@ -55,31 +80,6 @@ https://github.com/OliverSherouse/bls
 #####api_key.txt
 Your BLS api key, available here:
 http://data.bls.gov/registrationEngine/
-
-#####sql_engine.txt
-The SQLAlchemy address to your sql database:
-http://docs.sqlalchemy.org/en/latest/core/engines.html
-
-
-##dimension_maker.py
-Does the following:
-
-1. Constructs dimension tables for: series, measure, geographic, and sector codes.
-2. Fills these dimension tables with all available codes and descriptions for all prefixes in the prefix file.
-3. Creates a unique ID for each entry using the MySQL autoincrement function.
-
-
-###Requirements
-#####SQLAlchemy
-http://docs.sqlalchemy.org/en/latest/intro.html#installation-guide
-
-#####pandas
-http://pandas.pydata.org/pandas-docs/stable/install.html
-
-#####numpy
-http://www.numpy.org/
-
-####In directory:
 
 #####sql_engine.txt
 The SQLAlchemy address to your sql database:

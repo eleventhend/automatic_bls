@@ -24,6 +24,7 @@ def add_dedupe(df, engine, table, uniques, id_name):
 
     return
 
+#import and setup SQL engine address
 with open ('sql_engine.txt', 'r') as f:
     engine_address = f.read()
 engine = create_engine(engine_address)
@@ -49,12 +50,21 @@ engine.execute("CREATE TABLE IF NOT EXISTS dim_sector (`sector_id` \
     `sector_text` varchar(128), `prefix` varchar(4), PRIMARY KEY \
     (`sector_id`))")
 
+#gets all dataset prefixes as listed in prefix.csv
 prefix = pd.read_csv("prefix.csv")
 
+#initialize empty dataframe
 df_empty = pd.DataFrame(index=[0], columns=['series_code', 
     'prefix', 'prefix_long', 'prefix_desc', 'seasonal_code', 'seasonal_desc', 
     'area_code', 'sector_code', 'sector_text', 'measure_code', 'measure_text'])
 
+"""
+Fills the empty dataframe with:
+    concatenated series codes (reason for nested for loops)
+    individual series components
+Periodically uploads the data to the sql database, in order to prevent 
+    stack overflow from occuring
+"""
 for aa in range(0, len(prefix.index), 1):
     p = prefix['prefix'].iloc[aa]
     area = pd.read_csv(p + "/area_codes.csv",

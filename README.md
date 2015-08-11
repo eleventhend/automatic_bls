@@ -1,5 +1,5 @@
 # Automatic BLS!
-Making BLS data accessible since May 2015.
+Collecting BLS data since May 2015.
 
 ##How to use
 1. Download and install all required packages (see below)

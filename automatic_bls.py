@@ -143,7 +143,6 @@ def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="",
             "dx": dimx, "dxj": dx_join, "dxi": dx_id})
     return
 
-
 #Creates and retrieves command line arguments
 #which determine the target dataset and year range
 parser = argparse.ArgumentParser(description='Retrieve BLS data', 

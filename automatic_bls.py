@@ -33,6 +33,9 @@ from bls import get_series
 
 def api_to_sql(engine, series, api_key, start_year, end_year):
     """
+    Calls the API using get_series(), returning a dataframe version of the JSON
+        response from the API
+
     Outputs to a sql database a fact table based on an input of
         a tuple of tuples of series to fetch and a desired date range.
 
@@ -104,6 +107,10 @@ def data_extractor(engine, prefix, seasonal, area, m_c, api_key, startyear,
     return
 
 def create_index(engine, table, index, column):
+    """
+    Checks whether a specific index exists on a column in a table;
+        if it does not, it is created
+    """
     result = engine.execute(
         """SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS
         WHERE table_schema = 'atlas_bls'

@@ -145,7 +145,8 @@ def cross_populate(engine, fact, dim, f_join, d_join, f_id="", d_id="",
         create_index(engine, dimx, dx_join, dx_join)
         engine.execute("""UPDATE %(f)s f JOIN %(d)s dts ON \
             f.%(fj)s = dts.%(dj)s JOIN %(dx)s dtx ON \
-            dts.%(dxj)s = dtx.%(dxj)s SET f.%(dxi)s = dtx.%(dxi)s""" 
+            dts.%(dxj)s = dtx.%(dxj)s AND dts.`prefix` = dtx.`prefix` \
+            SET f.%(dxi)s = dtx.%(dxi)s""" 
             %{"f": fact, "d": dim, "fj": f_join, "dj": d_join, 
             "dx": dimx, "dxj": dx_join, "dxi": dx_id})
     return
@@ -165,6 +166,7 @@ parser.add_argument("--end_year", type=int, default=(date.today().year),
     metavar='1980-%(y)i' %{"y": date.today().year},
     help='Optional - end year for data range. Year range cannot exceed 10.')
 args = parser.parse_args()
+prefix = args.Prefix
 startyear = args.start_year
 endyear = args.end_year
 #Ensures year range is confined to 10 years; converts inputs to strings
@@ -183,10 +185,10 @@ with open ('sql_engine.txt', 'r') as f:
 engine = create_engine(engine_address)
 
 #Get series code components from CSV
-s_df = pd.read_csv(args.Prefix + "/seasonal_codes.csv")
-area_df = pd.read_csv(args.Prefix + "/area_codes.csv",
+s_df = pd.read_csv(prefix + "/seasonal_codes.csv")
+area_df = pd.read_csv(prefix + "/area_codes.csv",
     converters={'area_code': lambda x: str(x)})
-mc_df = pd.read_csv(args.Prefix + "/measure_codes.csv",
+mc_df = pd.read_csv(prefix + "/measure_codes.csv",
     converters={'measure_code': lambda x: str(x)})
 
 #set up empty incubator table
@@ -205,12 +207,12 @@ Extraction occurs here--creates and splits the series codes into batches
    into the incubator table.
 """
 try:
-    sector_df = pd.read_csv(args.Prefix + "/sector_codes.csv",
+    sector_df = pd.read_csv(prefix + "/sector_codes.csv",
         converters={'sector_code': lambda x: str(x)})
-    data_extractor(engine, args.Prefix, s_df, area_df, mc_df, api_key, 
+    data_extractor(engine, prefix, s_df, area_df, mc_df, api_key, 
         startyear, endyear, sector_df)
 except:
-    data_extractor(engine, args.Prefix, s_df, area_df, mc_df, api_key, 
+    data_extractor(engine, prefix, s_df, area_df, mc_df, api_key, 
         startyear, endyear)
 
 #Checks that fact and archive tables exist
@@ -247,15 +249,16 @@ engine.execute("INSERT INTO dim_date \
 
 #cross-populates foreign keys to fact table from all dimension tables
 cross_populate(engine, "incubator", "dim_series", "series", "series_code", 
-    "series_id", "series_id", series_run=True)
+    f_id="series_id", d_id="series_id", series_run=True)
 cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
     dimx="dim_area", dx_join="area_code", dx_id="area_id")
 cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
-    dimx="dim_measure", dx_join="measure_text", dx_id="measure_id")
+    dimx="dim_measure", dx_join="measure_code", dx_id="measure_id")
 cross_populate(engine, "incubator", "dim_series", "series_id", "series_id", 
-    dimx="dim_sector", dx_join="sector_text", dx_id="sector_id")
+    dimx="dim_sector", dx_join="sector_code", dx_id="sector_id")
+#wizardy here: the use case for the date table is the same as the series table
 cross_populate(engine, "incubator", "dim_date", "date", "date_full", 
-    "date_id", "date_id", series_run=True)
+    f_id="date_id", d_id="date_id", series_run=True)
 
 #Inserts incubator entries into fact table, updating data when possible
 engine.execute("INSERT INTO fact (`series`, `data`, `date`, `series_id`, \

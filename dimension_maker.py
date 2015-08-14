@@ -101,14 +101,14 @@ for aa in range(0, len(prefix.index), 1):
         sector = pd.read_csv(p + "/sector_codes.csv",
             converters={'sector_code': lambda x: str(x)})
         sector['prefix'] = p
-        add_dedupe(sector, engine, "dim_sector", "sector_code, sector_text", "sector_id")
+        add_dedupe(sector, engine, "dim_sector", "sector_code, sector_text, prefix", "sector_id")
     except:
         sector_none = pd.DataFrame(index=[0], columns=['sector_code', 
             'sector_text', 'prefix'])
         sector_none['sector_code'] = "none"
         sector_none['sector_text'] = "default no sector"
-        #sector_none['prefix'] = p
-        add_dedupe(sector_none, engine, "dim_sector", "sector_code, sector_text", "sector_id")
+        sector_none['prefix'] = p
+        add_dedupe(sector_none, engine, "dim_sector", "sector_code, sector_text, prefix", "sector_id")
         sector = pd.DataFrame(index=[0], columns=['sector_code'])
         sector = sector.fillna('')
     for x in range(0, len(seasonal.index), 1):
@@ -141,5 +141,5 @@ for aa in range(0, len(prefix.index), 1):
     area['prefix'] = p
     m_c['prefix'] = p
     seasonal['prefix'] = p
-    add_dedupe(area, engine, "dim_area", "area_code, area_text", "area_id")
-    add_dedupe(m_c, engine, "dim_measure", "measure_code, measure_text", "measure_id")
+    add_dedupe(area, engine, "dim_area", "area_code, area_text, prefix", "area_id")
+    add_dedupe(m_c, engine, "dim_measure", "measure_code, measure_text, prefix", "measure_id")

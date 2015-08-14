@@ -113,13 +113,12 @@ def create_index(engine, table, index, column):
     """
     result = engine.execute(
         """SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS
-        WHERE table_schema = 'atlas_bls'
-        AND table_name = %(t)s AND index_name = %(i)s;""" 
+        WHERE table_name = %(t)s AND index_name = %(i)s;""" 
         %{"t": "'" + table + "'", "i": "'" + index + "'"})
 
     index_exists = result.fetchall()
     if index_exists[0][0] == 0:
-        engine.execute("CREATE INDEX %(i)s ON atlas_bls.%(t)s(%(c)s)"
+        engine.execute("CREATE INDEX %(i)s ON %(t)s(%(c)s)"
             %{"t": table, "i": index, "c": column})
     return
 

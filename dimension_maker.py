@@ -114,13 +114,13 @@ for aa in range(0, len(prefix.index), 1):
     for x in range(0, len(seasonal.index), 1):
         for y in range(0, len(m_c.index), 1):
             for z in range(0, len(sector.index), 1):
-                df_series = df_empty
+                df_series = df_empty.copy()
                 for i in range(0, len(area.index), 1):
                     ser_concat = (p + seasonal['seasonal_code'].iloc[x] + 
                         area['area_code'].iloc[i] + 
                         sector['sector_code'].iloc[z] + 
                         m_c['measure_code'].iloc[y])
-                    df_concat = df_empty
+                    df_concat = df_empty.copy()
                     df_concat['series_code'] = ser_concat
                     df_concat['area_code'] = area['area_code'].iloc[i]
                     df_series = df_series.append(df_concat, True)

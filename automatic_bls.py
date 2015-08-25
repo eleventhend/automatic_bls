@@ -45,7 +45,7 @@ def api_to_sql(engine, series, api_key, start_year, end_year):
     """
     try:
         df = get_series(series, api_key, start_year, end_year)
-        for k in range (1, len(df.columns)):
+        for k in range(0, len(df.columns)):
             df_sql = dataframe_sequencer(df, k)
             df_sql.to_sql(con=engine, name='incubator', if_exists='append', 
                 index=False)

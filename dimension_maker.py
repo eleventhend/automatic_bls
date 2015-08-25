@@ -86,7 +86,7 @@ Fills the empty dataframe with:
 Periodically uploads the data to the sql database, in order to prevent 
     stack overflow from occuring
 """
-for aa in range(0, len(prefix.index), 1):
+for aa in xrange(0, len(prefix.index), 1):
     p = prefix['prefix'].iloc[aa]
     area = pd.read_csv(p + "/area_codes.csv",
         converters={
@@ -111,11 +111,11 @@ for aa in range(0, len(prefix.index), 1):
         add_dedupe(sector_none, engine, "dim_sector", "sector_code, sector_text, prefix", "sector_id")
         sector = pd.DataFrame(index=[0], columns=['sector_code'])
         sector = sector.fillna('')
-    for x in range(0, len(seasonal.index), 1):
-        for y in range(0, len(m_c.index), 1):
-            for z in range(0, len(sector.index), 1):
+    for x in xrange(0, len(seasonal.index), 1):
+        for y in xrange(0, len(m_c.index), 1):
+            for z in xrange(0, len(sector.index), 1):
                 df_series = df_empty.copy()
-                for i in range(0, len(area.index), 1):
+                for i in xrange(0, len(area.index), 1):
                     ser_concat = (p + seasonal['seasonal_code'].iloc[x] + 
                         area['area_code'].iloc[i] + 
                         sector['sector_code'].iloc[z] + 
@@ -137,6 +137,7 @@ for aa in range(0, len(prefix.index), 1):
                 df_series['seasonal_desc'] = seasonal['seasonal_text'].iloc[x]
                 df_series['measure_code'] = m_c['measure_code'].iloc[y]
                 df_series['measure_text'] = m_c['measure_text'].iloc[y]
+                df_series.drop(df_series.index[:1], inplace=1)
                 add_dedupe(df_series, engine, "dim_series", "series_code", "series_id")
     area['prefix'] = p
     m_c['prefix'] = p

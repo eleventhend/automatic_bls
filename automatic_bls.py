@@ -157,12 +157,12 @@ parser = argparse.ArgumentParser(description='Retrieve BLS data',
 parser.add_argument("Prefix", help="Requires the prefix of the desired \
     database as an argument")
 parser.add_argument("--start_year", type=int, default=(date.today().year-1), 
-    choices=xrange(1980, (date.today().year)), 
-    metavar='1980-%(y)i' %{"y": (date.today().year-1)},
+    choices=xrange(1990, (date.today().year)), 
+    metavar='1990-%(y)i' %{"y": (date.today().year-1)},
     help='Optional - start year for data range.')
 parser.add_argument("--end_year", type=int, default=(date.today().year), 
-    choices=xrange(1980, (date.today().year+1)), 
-    metavar='1980-%(y)i' %{"y": date.today().year},
+    choices=xrange(1990, (date.today().year+1)), 
+    metavar='1990-%(y)i' %{"y": date.today().year},
     help='Optional - end year for data range. Year range cannot exceed 10.')
 args = parser.parse_args()
 prefix = args.Prefix
